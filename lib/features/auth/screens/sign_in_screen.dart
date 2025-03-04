@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_socket_io/providers/home.dart';
 import 'package:flutter_socket_io/providers/login.dart';
-import 'package:flutter_socket_io/screens/home.dart';
+import 'package:flutter_socket_io/features/home/home_screen.dart';
 import 'package:provider/provider.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+import '../../home/home_cubit.dart';
+import '../cubits/sign_in/sign_in_cubit.dart';
+import '../cubits/sign_in/sign_in_state.dart';
+
+
+class SignInScreen extends StatefulWidget {
+  const SignInScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignInScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<SignInScreen> {
   final TextEditingController _usernameController = TextEditingController();
 
   @override
@@ -21,22 +27,22 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   _login() {
-    final provider = Provider.of<LoginProvider>(context, listen: false);
-    if (_usernameController.text.trim().isNotEmpty) {
-      provider.setErrorMessage('');
+    final loginCubit = context.read<SignInCubit>();
+    final username = _usernameController.text.trim();
+
+    if (username.isNotEmpty) {
+      loginCubit.clearError();
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ChangeNotifierProvider(
-            create: (context) => HomeProvider(),
-            child: HomeScreen(
-              username: _usernameController.text.trim(),
-            ),
+          builder: (_) => BlocProvider(
+            create: (_) => HomeCubit(username), // ✅ Truyền username vào HomeCubit
+            child: HomeScreen(username: username),
           ),
         ),
       );
     } else {
-      provider.setErrorMessage('Username is required!');
+      loginCubit.setErrorMessage('Username is required!');
     }
   }
 
@@ -49,23 +55,25 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Selector<LoginProvider, String>(
-                selector: (_, provider) => provider.errorMessage,
-                builder: (_, errorMessage, __) => errorMessage != ''
-                    ? Padding(
-                        padding: const EdgeInsets.only(bottom: 30.0),
-                        child: Card(
-                          color: Colors.red,
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              errorMessage,
-                              style: const TextStyle(color: Colors.white),
-                            ),
+              BlocBuilder<SignInCubit, SignInState>(
+                builder: (_, state) {
+                  if (state.errorMessage.isNotEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 30.0),
+                      child: Card(
+                        color: Colors.red,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            state.errorMessage,
+                            style: const TextStyle(color: Colors.white),
                           ),
                         ),
-                      )
-                    : Container(),
+                      ),
+                    );
+                  }
+                  return Container();
+                },
               ),
               Image.asset('assets/socket_icon.png'),
               const SizedBox(

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_socket_io/providers/login.dart';
-import 'package:flutter_socket_io/screens/login.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import 'features/auth/cubits/sign_in/sign_in_cubit.dart';
+import 'features/auth/screens/sign_in_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,15 +13,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Socket.IO',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: ChangeNotifierProvider(
-        create: (context) => LoginProvider(),
-        child: const LoginScreen(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => SignInCubit()),
+      ],
+      child: MaterialApp(
+        title: 'Flutter Socket.IO',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
+        home: const SignInScreen(),
       ),
     );
   }

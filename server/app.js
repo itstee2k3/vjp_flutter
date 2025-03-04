@@ -6,9 +6,17 @@ const { Server } = require("socket.io");
 const io = new Server(server);
 const messages = []
 
+app.get('/', (req, res) => {
+  res.send('Server is running!');
+});
+
+app.get('/messages', (req, res) => {
+  res.json(messages);
+});
 
 io.on('connection', (socket) => {
   const username = socket.handshake.query.username
+
   socket.on('message', (data) => {
     const message = {
       message: data.message,
