@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../features/auth/cubits/auth_cubit.dart';
-import '../../features/auth/cubits/auth_state.dart';
+import '../../features/auth/cubits/auth_state.dart' as auth;
 
 class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoggedIn;
@@ -18,7 +18,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthCubit, AuthState>(
+    return BlocBuilder<AuthCubit, auth.AuthState>(
       builder: (context, state) {
         return AppBar(
           automaticallyImplyLeading: false,
@@ -60,7 +60,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildUserActions(BuildContext context, AuthState state) {
+  Widget _buildUserActions(BuildContext context, auth.AuthState state) {
     return Row(
       children: [
         _buildLanguageSelector(),
@@ -75,13 +75,12 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           const SizedBox(width: 16),
-          _buildActionButton(
-            title: "Đăng xuất",
-            color: Colors.grey,
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.black87),
             onPressed: () {
               context.read<AuthCubit>().logout();
               Navigator.of(context).pushNamedAndRemoveUntil(
-                '/home',
+                '/',
                 (route) => false,
               );
             },
@@ -90,9 +89,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
           _buildActionButton(
             title: "Đăng Nhập",
             color: Colors.red,
-            onPressed: () {
-              Navigator.pushNamed(context, '/');
-            },
+            onPressed: () => Navigator.pushNamed(context, '/'),
           ),
       ],
     );

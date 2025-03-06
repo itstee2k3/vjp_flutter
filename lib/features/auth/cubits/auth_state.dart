@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:convert' show utf8;
+import 'package:equatable/equatable.dart';
 
-class AuthState {
+class AuthState extends Equatable {
   final bool isAuthenticated;
   final String? accessToken;
   final String? refreshToken;
@@ -10,7 +11,7 @@ class AuthState {
   final String? message;
   final Map<String, dynamic>? userData;
 
-  AuthState({
+  const AuthState({
     this.isAuthenticated = false,
     this.accessToken,
     this.refreshToken,
@@ -19,6 +20,9 @@ class AuthState {
     this.message,
     this.userData,
   });
+
+  @override
+  List<Object?> get props => [isAuthenticated, accessToken, refreshToken, fullName, email, message, userData];
 
   AuthState copyWith({
     bool? isAuthenticated,
@@ -43,21 +47,25 @@ class AuthState {
   factory AuthState.fromJson(Map<String, dynamic> json) {
     final token = json['accessToken'];
     if (token != null) {
-      final parts = token.split('.');
-      if (parts.length == 3) {
-        final payload = parts[1];
-        final normalized = base64Url.normalize(payload);
-        final resp = utf8.decode(base64Url.decode(normalized));
-        final payloadMap = jsonDecode(resp);
-        
-        return AuthState(
-          isAuthenticated: json['success'] ?? false,
-          accessToken: token,
-          refreshToken: json['refreshToken'],
-          fullName: payloadMap['FullName'] ?? json['fullName'],
-          email: payloadMap['email'] ?? json['email'],
-          userData: payloadMap,
-        );
+      try {
+        final parts = token.split('.');
+        if (parts.length == 3) {
+          final payload = parts[1];
+          final normalized = base64Url.normalize(payload);
+          final resp = utf8.decode(base64Url.decode(normalized));
+          final payloadMap = jsonDecode(resp);
+          
+          return AuthState(
+            isAuthenticated: true,
+            accessToken: token,
+            refreshToken: json['refreshToken'],
+            fullName: payloadMap['FullName'] ?? json['fullName'] ?? 'User',
+            email: payloadMap['email'] ?? json['email'] ?? '',
+            userData: payloadMap,
+          );
+        }
+      } catch (e) {
+        print('Error parsing JWT: $e');
       }
     }
     
@@ -65,8 +73,8 @@ class AuthState {
       isAuthenticated: json['success'] ?? false,
       accessToken: json['accessToken'],
       refreshToken: json['refreshToken'],
-      fullName: json['fullName'],
-      email: json['email'],
+      fullName: json['fullName'] ?? 'User',
+      email: json['email'] ?? '',
     );
   }
 }

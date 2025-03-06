@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_socket_io/features/auth/cubits/auth_cubit.dart';
-import 'package:flutter_socket_io/services/api/api_service.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
+import 'features/auth/cubits/auth_cubit.dart';
+import 'services/api/api_service.dart';
 import 'core/config/app_routes.dart';
 import 'features/auth/cubits/sign_in/sign_in_cubit.dart';
 import 'features/home/cubits/home_cubit.dart';
@@ -10,25 +10,31 @@ import 'features/home/cubits/home_cubit.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  final prefs = await SharedPreferences.getInstance();
   final apiService = ApiService();
   
-  runApp(MyApp(apiService: apiService));
+  runApp(MyApp(prefs: prefs, apiService: apiService));
 }
 
 class MyApp extends StatelessWidget {
+  final SharedPreferences prefs;
   final ApiService apiService;
   
   const MyApp({
-    Key? key,
+    super.key, 
+    required this.prefs,
     required this.apiService,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => AuthCubit(apiService),
+          create: (context) => AuthCubit(
+            prefs: prefs,
+            apiService: apiService,
+          )..checkAuthStatus(),
         ),
         BlocProvider(
           create: (context) => SignInCubit(

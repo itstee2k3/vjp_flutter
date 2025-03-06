@@ -40,49 +40,34 @@ class SignInCubit extends Bloc<SignInEvent, SignInState> {
     emit(state.copyWith(password: password, passwordError: passwordError));
   }
 
-  void _onSubmitted(SignInSubmitted event, Emitter<SignInState> emit) async {
-    String? emailError;
-    String? passwordError;
-
-    if (state.email.isEmpty) {
-      emailError = "Email không được để trống!";
-    }
-    if (state.password.isEmpty) {
-      passwordError = "Mật khẩu không được để trống!";
-    }
-
-    // Nếu có lỗi, cập nhật state và không tiếp tục xử lý đăng nhập
-    if (emailError != null || passwordError != null) {
-      emit(state.copyWith(emailError: emailError, passwordError: passwordError));
-      return;
-    }
-
-    emit(state.copyWith(isLoading: true, emailError: '', passwordError: '', errorMessage: ''));
-
+  Future<void> _onSubmitted(
+    SignInSubmitted event,
+    Emitter<SignInState> emit,
+  ) async {
     try {
-      final response = await _apiService.login(state.email, state.password);
-      print("API Response: $response"); // Debug response
+      emit(state.copyWith(isLoading: true));
 
-      // Kiểm tra xem response có chứa token không
-      if (response['success']) {
-        _authCubit.loginSuccess(response);
+      final result = await _apiService.login(state.email, state.password);
+
+      if (result['success']) {
+        // Thông báo cho AuthCubit về đăng nhập thành công
+        await _authCubit.loginSuccess(result);
+        
         emit(state.copyWith(
           isLoading: false,
           isSuccess: true,
-          errorMessage: '',
+          message: result['message'],
         ));
       } else {
         emit(state.copyWith(
           isLoading: false,
-          isSuccess: false,
-          errorMessage: response['message'] ?? 'Đăng nhập thất bại',
+          errorMessage: result['message'],
         ));
       }
     } catch (e) {
-      print("Error: $e"); // Debug lỗi
       emit(state.copyWith(
         isLoading: false,
-        errorMessage: 'Đăng nhập thất bại: $e',
+        errorMessage: 'Đã xảy ra lỗi: ${e.toString()}',
       ));
     }
   }
