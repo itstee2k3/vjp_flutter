@@ -56,7 +56,7 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {
           'success': true,
-          'message': 'Đăng ký thành công',
+          'message':  jsonDecode(response.body)['message'] ?? 'Đăng ký thành công',
           'data': jsonDecode(response.body)
         };
       } else {

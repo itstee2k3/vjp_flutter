@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_socket_io/services/api/chat_api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'features/auth/cubits/auth_cubit.dart';
+import 'features/chat/cubits/chat_list_cubit.dart';
 import 'services/api/api_service.dart';
 import 'core/config/app_routes.dart';
 import 'features/auth/cubits/sign_in/sign_in_cubit.dart';
@@ -9,19 +11,23 @@ import 'features/home/cubits/home_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   final prefs = await SharedPreferences.getInstance();
   final apiService = ApiService();
-  
-  runApp(MyApp(prefs: prefs, apiService: apiService));
+
+  runApp(MyApp(
+    prefs: prefs,
+    apiService: apiService,
+  ));
 }
+
 
 class MyApp extends StatelessWidget {
   final SharedPreferences prefs;
   final ApiService apiService;
-  
+
   const MyApp({
-    super.key, 
+    super.key,
     required this.prefs,
     required this.apiService,
   });
@@ -37,13 +43,19 @@ class MyApp extends StatelessWidget {
           )..checkAuthStatus(),
         ),
         BlocProvider(
-          create: (context) => SignInCubit(
-            apiService,
-            context.read<AuthCubit>(),
-          ),
+          create: (context) {
+            final authCubit = context.read<AuthCubit>();
+            return ChatListCubit(
+              ChatApiService(
+                token: authCubit.state.accessToken,
+                currentUserId: authCubit.state.userId,
+              ),
+              authCubit: authCubit,
+            );
+          },
         ),
         BlocProvider(
-          create: (_) => HomeCubit(),
+          create: (context) => HomeCubit(),
         ),
       ],
       child: MaterialApp(

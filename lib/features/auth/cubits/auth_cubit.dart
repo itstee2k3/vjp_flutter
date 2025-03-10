@@ -6,21 +6,23 @@ import 'auth_state.dart';
 class AuthCubit extends Cubit<AuthState> {
   final ApiService _apiService;
   final SharedPreferences prefs;
-  
+
   static const String KEY_ACCESS_TOKEN = 'access_token';
   static const String KEY_REFRESH_TOKEN = 'refresh_token';
   static const String KEY_EMAIL = 'email';
   static const String KEY_FULL_NAME = 'full_name';
+  static const String KEY_USER_ID = 'user_id';
 
-  AuthCubit({required this.prefs, required ApiService apiService}) 
+  AuthCubit({required this.prefs, required ApiService apiService})
     : _apiService = apiService,
-      super(const AuthState()) {
+      super(AuthState()) {
     checkAuthStatus(); // Kiểm tra trạng thái auth khi khởi tạo
   }
 
   Future<void> checkAuthStatus() async {
     final accessToken = prefs.getString(KEY_ACCESS_TOKEN);
     final refreshToken = prefs.getString(KEY_REFRESH_TOKEN);
+    final userId = prefs.getString(KEY_USER_ID);
 
     if (accessToken != null && refreshToken != null) {
       // Tạo response map để parse thông tin từ token
@@ -28,17 +30,20 @@ class AuthCubit extends Cubit<AuthState> {
         'success': true,
         'accessToken': accessToken,
         'refreshToken': refreshToken,
+        'userId': userId,
       };
-      
+
       emit(AuthState.fromJson(response));
     }
   }
 
   Future<void> loginSuccess(Map<String, dynamic> response) async {
     try {
-      // Lưu thông tin vào SharedPreferences
-      if (response['accessToken'] != null) {
-        await prefs.setString(KEY_ACCESS_TOKEN, response['accessToken']);
+      final accessToken = response['accessToken'];
+      print('Saving token: $accessToken'); // Debug log
+
+      if (accessToken != null) {
+        await prefs.setString(KEY_ACCESS_TOKEN, accessToken);
       }
       if (response['refreshToken'] != null) {
         await prefs.setString(KEY_REFRESH_TOKEN, response['refreshToken']);
@@ -49,12 +54,21 @@ class AuthCubit extends Cubit<AuthState> {
       if (response['fullName'] != null) {
         await prefs.setString(KEY_FULL_NAME, response['fullName']);
       }
+      
+      // Tạo AuthState để trích xuất userId từ token
+      final authState = AuthState.fromJson(response);
+      
+      // Lưu userId nếu có
+      if (authState.userId != null) {
+        await prefs.setString(KEY_USER_ID, authState.userId!);
+        print('Đã lưu userId: ${authState.userId}');
+      }
 
-      emit(AuthState.fromJson(response));
+      emit(authState);
     } catch (e) {
-      print('Error saving auth data: $e');
+      print('Error in loginSuccess: $e');
       // Emit default state if error occurs
-      emit(const AuthState(isAuthenticated: true));
+      emit(AuthState(isAuthenticated: true));
     }
   }
 
@@ -64,13 +78,14 @@ class AuthCubit extends Cubit<AuthState> {
     } catch (e) {
       print('Logout error: $e');
     }
-    
+
     // Luôn xóa thông tin local
     await prefs.remove(KEY_ACCESS_TOKEN);
     await prefs.remove(KEY_REFRESH_TOKEN);
     await prefs.remove(KEY_EMAIL);
     await prefs.remove(KEY_FULL_NAME);
-    
-    emit(const AuthState());
+    await prefs.remove(KEY_USER_ID);
+
+    emit(AuthState());
   }
 }

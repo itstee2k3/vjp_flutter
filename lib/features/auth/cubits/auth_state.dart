@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:convert' show utf8;
-import 'package:equatable/equatable.dart';
 
-class AuthState extends Equatable {
+class AuthState {
   final bool isAuthenticated;
   final String? accessToken;
   final String? refreshToken;
@@ -10,8 +9,9 @@ class AuthState extends Equatable {
   final String? email;
   final String? message;
   final Map<String, dynamic>? userData;
+  final String? userId;
 
-  const AuthState({
+  AuthState({
     this.isAuthenticated = false,
     this.accessToken,
     this.refreshToken,
@@ -19,10 +19,8 @@ class AuthState extends Equatable {
     this.email,
     this.message,
     this.userData,
+    this.userId,
   });
-
-  @override
-  List<Object?> get props => [isAuthenticated, accessToken, refreshToken, fullName, email, message, userData];
 
   AuthState copyWith({
     bool? isAuthenticated,
@@ -32,6 +30,7 @@ class AuthState extends Equatable {
     String? message,
     String? email,
     Map<String, dynamic>? userData,
+    String? userId,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -41,40 +40,39 @@ class AuthState extends Equatable {
       message: message ?? this.message,
       email: email ?? this.email,
       userData: userData ?? this.userData,
+      userId: userId ?? this.userId,
     );
   }
 
   factory AuthState.fromJson(Map<String, dynamic> json) {
-    final token = json['accessToken'];
+    String? token = json['accessToken'];
     if (token != null) {
-      try {
-        final parts = token.split('.');
-        if (parts.length == 3) {
-          final payload = parts[1];
-          final normalized = base64Url.normalize(payload);
-          final resp = utf8.decode(base64Url.decode(normalized));
-          final payloadMap = jsonDecode(resp);
-          
-          return AuthState(
-            isAuthenticated: true,
-            accessToken: token,
-            refreshToken: json['refreshToken'],
-            fullName: payloadMap['FullName'] ?? json['fullName'] ?? 'User',
-            email: payloadMap['email'] ?? json['email'] ?? '',
-            userData: payloadMap,
-          );
-        }
-      } catch (e) {
-        print('Error parsing JWT: $e');
+      final parts = token.split('.');
+      if (parts.length == 3) {
+        final payload = parts[1];
+        final normalized = base64Url.normalize(payload);
+        final payloadMap = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+        
+        return AuthState(
+          isAuthenticated: true,
+          accessToken: token,
+          refreshToken: json['refreshToken'],
+          fullName: payloadMap['FullName'] ?? json['fullName'] ?? 'User',
+          email: payloadMap['email'] ?? json['email'] ?? '',
+          userId: payloadMap['sub'],
+        );
       }
     }
     
     return AuthState(
-      isAuthenticated: json['success'] ?? false,
+      isAuthenticated: true,
       accessToken: json['accessToken'],
       refreshToken: json['refreshToken'],
       fullName: json['fullName'] ?? 'User',
       email: json['email'] ?? '',
+      userId: json['userId'],
     );
   }
+
+  String? get token => accessToken;
 }
