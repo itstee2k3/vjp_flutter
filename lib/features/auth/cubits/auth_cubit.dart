@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/api/api_service.dart';
 import 'auth_state.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class AuthCubit extends Cubit<AuthState> {
   final ApiService _apiService;
@@ -74,18 +76,30 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> logout() async {
     try {
-      await _apiService.logout();
+      final accessToken = state.accessToken;
+      final refreshToken = state.refreshToken;
+      
+      if (accessToken != null && refreshToken != null) {
+        await _apiService.logout(accessToken, refreshToken);
+      }
+      
+      // Xóa token khỏi bộ nhớ
+      await prefs.remove(KEY_ACCESS_TOKEN);
+      await prefs.remove(KEY_REFRESH_TOKEN);
+      await prefs.remove(KEY_EMAIL);
+      await prefs.remove(KEY_FULL_NAME);
+      await prefs.remove(KEY_USER_ID);
+
+      emit(AuthState());
     } catch (e) {
-      print('Logout error: $e');
+      print('Error during logout: $e');
+      // Vẫn xóa token khỏi bộ nhớ ngay cả khi có lỗi
+      await prefs.remove(KEY_ACCESS_TOKEN);
+      await prefs.remove(KEY_REFRESH_TOKEN);
+      await prefs.remove(KEY_EMAIL);
+      await prefs.remove(KEY_FULL_NAME);
+      await prefs.remove(KEY_USER_ID);
+      emit(AuthState());
     }
-
-    // Luôn xóa thông tin local
-    await prefs.remove(KEY_ACCESS_TOKEN);
-    await prefs.remove(KEY_REFRESH_TOKEN);
-    await prefs.remove(KEY_EMAIL);
-    await prefs.remove(KEY_FULL_NAME);
-    await prefs.remove(KEY_USER_ID);
-
-    emit(AuthState());
   }
 }

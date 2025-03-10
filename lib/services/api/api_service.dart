@@ -71,22 +71,29 @@ class ApiService {
   }
 
   // Đăng xuất
-  Future<Map<String, dynamic>> logout() async {
+  Future<Map<String, dynamic>> logout(String accessToken, String refreshToken) async {
     try {
       final response = await http.post(
         Uri.parse("$baseUrl/logout"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $accessToken"
+        },
+        body: jsonEncode({"refreshToken": refreshToken}),
       );
+
+      print('Logout response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
         return {'success': true, 'message': 'Đăng xuất thành công'};
       } else {
         return {
           'success': false,
-          'message': 'Đăng xuất thất bại',
+          'message': 'Đăng xuất thất bại: ${response.body}',
         };
       }
     } catch (e) {
+      print('Error during logout: $e');
       return {'success': false, 'message': 'Lỗi kết nối: ${e.toString()}'};
     }
   }
