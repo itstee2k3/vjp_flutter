@@ -50,75 +50,49 @@ class ChatCubit extends Cubit<ChatState> {
       _chatService.connect();
     }
     
-    // Lắng nghe tin nhắn mới
+    // Lắng nghe tin nhắn mới từ SignalR
     _messageSubscription = _chatService.messageStream.listen((message) {
-      print('New message received in stream: ${message.content}');
-      print('Message senderId: ${message.senderId}, receiverId: ${message.receiverId}');
-      print('Current conversation: currentUserId=${_chatService.currentUserId}, receiverId=$receiverId');
-      
-      // Kiểm tra xem tin nhắn có liên quan đến cuộc trò chuyện hiện tại không
-      bool isRelevantMessage = 
-        (message.senderId == _chatService.currentUserId && message.receiverId == receiverId) ||
-        (message.senderId == receiverId && message.receiverId == _chatService.currentUserId);
-      
-      print('Is message relevant to current conversation: $isRelevantMessage');
-      
-      if (isRelevantMessage) {
-        // Tạo ID duy nhất cho tin nhắn để kiểm tra trùng lặp
-        String messageUniqueId = '${message.id ?? ''}|${message.senderId}|${message.content}|${message.sentAt.toIso8601String()}';
+      if (message.senderId == receiverId || message.receiverId == receiverId) {
+        print('=== Processing Realtime Message ===');
+        print('Message time before: ${message.sentAt}');
         
-        print('Processing message with ID: $messageUniqueId');
+        // Tạo bản sao của tin nhắn với thời gian UTC
+        final processedMessage = Message(
+          id: message.id,
+          senderId: message.senderId,
+          receiverId: message.receiverId,
+          content: message.content,
+          sentAt: message.sentAt, // Giữ nguyên thời gian
+          isRead: message.isRead,
+        );
         
-        // Kiểm tra xem tin nhắn đã được xử lý chưa
-        if (!_processedMessageIds.contains(messageUniqueId)) {
-          _processedMessageIds.add(messageUniqueId);
-          
-          // Thêm tin nhắn mới vào danh sách
-          final updatedMessages = List<Message>.from(state.messages);
-          
-          // Kiểm tra xem tin nhắn đã tồn tại trong danh sách chưa
-          bool isDuplicate = false;
-          
-          // Tìm và thay thế tin nhắn tạm thời
-          for (int i = 0; i < updatedMessages.length; i++) {
-            final existingMessage = updatedMessages[i];
-            
-            // Kiểm tra nếu là tin nhắn tạm thời (ID lớn) và nội dung giống nhau
-            if (existingMessage.id != null && 
-                existingMessage.id! > 1000000000000 && 
-                existingMessage.content == message.content && 
-                existingMessage.senderId == message.senderId) {
-              
-              print('Replacing temporary message with real message');
-              updatedMessages[i] = message;
-              isDuplicate = true;
-              break;
-            }
-            
-            // Kiểm tra nếu là tin nhắn trùng lặp thông thường
-            if ((existingMessage.id != null && existingMessage.id == message.id) || 
-                (existingMessage.content == message.content && 
-                 existingMessage.senderId == message.senderId && 
-                 (existingMessage.sentAt.difference(message.sentAt).inSeconds.abs() < 2))) {
-              
-              print('Message already exists in chat, skipping');
-              isDuplicate = true;
-              break;
-            }
-          }
-          
-          // Nếu không phải tin nhắn trùng lặp, thêm vào danh sách
-          if (!isDuplicate) {
-            updatedMessages.add(message);
-            print('Added new message to chat: ${message.content}');
-          }
-          
-          // Sắp xếp tin nhắn theo thời gian
-          updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-          emit(state.copyWith(messages: updatedMessages));
+        print('Message time after: ${processedMessage.sentAt}');
+        
+        // Kiểm tra xem tin nhắn đã tồn tại chưa
+        final existingIndex = state.messages.indexWhere((m) => 
+          m.id == processedMessage.id || 
+          (m.content == processedMessage.content && 
+           m.senderId == processedMessage.senderId &&
+           m.sentAt.difference(processedMessage.sentAt).inSeconds.abs() < 2)
+        );
+        
+        final updatedMessages = List<Message>.from(state.messages);
+        
+        if (existingIndex != -1) {
+          // Cập nhật tin nhắn hiện có
+          print('Updating existing message');
+          updatedMessages[existingIndex] = processedMessage;
         } else {
-          print('Message already processed, skipping duplicate');
+          // Thêm tin nhắn mới
+          print('Adding new message');
+          updatedMessages.add(processedMessage);
         }
+        
+        // Sắp xếp lại tin nhắn
+        updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+        
+        emit(state.copyWith(messages: updatedMessages));
+        print('=== End Processing ===');
       }
     });
     
@@ -180,41 +154,34 @@ class ChatCubit extends Cubit<ChatState> {
     if (content.trim().isEmpty) return;
     
     try {
-      // Tạo tin nhắn mới với ID tạm thời
-      final tempId = DateTime.now().millisecondsSinceEpoch;
-      final newMessage = Message(
-        id: tempId,
+      // Tạo tin nhắn tạm thời với thời gian local
+      final tempMessage = Message(
+        id: DateTime.now().millisecondsSinceEpoch,
         senderId: _chatService.currentUserId!,
         receiverId: receiverId,
         content: content,
-        sentAt: DateTime.now(),
+        // Chuyển thời gian local sang UTC để đồng nhất với server
+        sentAt: DateTime.now().toUtc(),
         isRead: false,
       );
       
-      // Thêm tin nhắn vào danh sách đã xử lý để tránh trùng lặp
-      String messageUniqueId = '${newMessage.id}|${newMessage.senderId}|${newMessage.content}|${newMessage.sentAt.toIso8601String()}';
-      _processedMessageIds.add(messageUniqueId);
-      
-      // Thêm tin nhắn vào danh sách ngay lập tức
-      final updatedMessages = List<Message>.from(state.messages)..add(newMessage);
+      // Thêm tin nhắn tạm vào UI
+      final updatedMessages = List<Message>.from(state.messages)..add(tempMessage);
       updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       emit(state.copyWith(
         messages: updatedMessages,
         isSending: true,
       ));
       
-      // Gửi tin nhắn qua API (không đợi kết quả để giảm độ trễ cảm nhận)
-      _chatService.sendMessage(receiverId, content).then((_) {
-        emit(state.copyWith(isSending: false));
-      }).catchError((e) {
-        print('Error sending message: $e');
-        emit(state.copyWith(
-          isSending: false,
-          error: e.toString(),
-        ));
-      });
+      // Gửi tin nhắn và đợi response từ server
+      await _chatService.sendMessage(receiverId, content);
+      
+      // Sau khi gửi thành công, sync lại tin nhắn để lấy thời gian chính xác từ server
+      await syncMessages();
+      
+      emit(state.copyWith(isSending: false));
     } catch (e) {
-      print('Error preparing message: $e');
+      print('Error sending message: $e');
       emit(state.copyWith(
         isSending: false,
         error: e.toString(),

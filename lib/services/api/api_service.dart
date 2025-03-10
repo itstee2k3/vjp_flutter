@@ -1,21 +1,37 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import '../../core/config/api_config.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiService {
-  static const String baseUrl = "http://127.0.0.1:5294/api/auth";
+  late final Dio dio;
 
+  ApiService() {
+    dio = Dio(BaseOptions(
+      baseUrl: ApiConfig.baseUrl,
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        if (kIsWeb) 'Access-Control-Allow-Origin': '*',
+      },
+    ));
 
+    print('API Service initialized with base URL: ${ApiConfig.baseUrl}');
+  }
 
   // Đăng nhập
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse("$baseUrl/login"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"email": email, "password": password}),
+      final response = await dio.post(
+        ApiConfig.loginUrl,
+        data: {
+          'email': email,
+          'password': password,
+        },
       );
 
-      final data = jsonDecode(response.body);
+      final data = response.data;
 
       if (response.statusCode == 200) {
         return {
@@ -32,6 +48,7 @@ class ApiService {
         };
       }
     } catch (e) {
+      print('Login error: $e');
       return {
         'success': false,
         'message': 'Lỗi kết nối: ${e.toString()}',
@@ -39,62 +56,73 @@ class ApiService {
     }
   }
 
-
   // Đăng ký
   Future<Map<String, dynamic>> register(String fullName, String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse("$baseUrl/register"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "fullName": fullName,
-          "email": email,
-          "password": password
-        }),
+      final response = await dio.post(
+        ApiConfig.registerUrl,
+        data: {
+          'fullName': fullName,
+          'email': email,
+          'password': password,
+        },
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {
           'success': true,
-          'message':  jsonDecode(response.body)['message'] ?? 'Đăng ký thành công',
-          'data': jsonDecode(response.body)
+          'message': response.data['message'] ?? 'Đăng ký thành công',
+          'data': response.data
         };
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Đăng ký thất bại'
+          'message': response.data['message'] ?? 'Đăng ký thất bại'
         };
       }
     } catch (e) {
-      return {'success': false, 'message': 'Lỗi kết nối: ${e.toString()}'};
+      print('Register error: $e');
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối: ${e.toString()}'
+      };
     }
   }
 
   // Đăng xuất
   Future<Map<String, dynamic>> logout(String accessToken, String refreshToken) async {
     try {
-      final response = await http.post(
-        Uri.parse("$baseUrl/logout"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $accessToken"
+      final response = await dio.post(
+        ApiConfig.logoutUrl,
+        data: {
+          'refreshToken': refreshToken,
         },
-        body: jsonEncode({"refreshToken": refreshToken}),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+          },
+        ),
       );
 
-      print('Logout response: ${response.statusCode} - ${response.body}');
+      print('Logout response: ${response.statusCode} - ${response.data}');
 
       if (response.statusCode == 200) {
-        return {'success': true, 'message': 'Đăng xuất thành công'};
+        return {
+          'success': true,
+          'message': 'Đăng xuất thành công'
+        };
       } else {
         return {
           'success': false,
-          'message': 'Đăng xuất thất bại: ${response.body}',
+          'message': 'Đăng xuất thất bại: ${response.data}',
         };
       }
     } catch (e) {
-      print('Error during logout: $e');
-      return {'success': false, 'message': 'Lỗi kết nối: ${e.toString()}'};
+      print('Logout error: $e');
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối: ${e.toString()}'
+      };
     }
   }
 }

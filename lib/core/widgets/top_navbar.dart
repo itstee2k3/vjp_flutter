@@ -103,15 +103,48 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
         return [
           PopupMenuItem<String>(
             value: 'vi',
-            child: const Text('Tiếng Việt'),
+            child: Row(
+              children: [
+                Image.network(
+                  'https://vjp-connect.com/images/logo2.png',
+                  width: 24,
+                  height: 24,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.flag, color: Colors.red);
+                  },
+                ),
+                SizedBox(width: 8),
+                Text('Tiếng Việt'),
+              ],
+            ),
           ),
           PopupMenuItem<String>(
             value: 'en',
-            child: const Text('Tiếng Anh'),
+            child: Row(
+              children: [
+                Image.network(
+                  'https://vjp-connect.com/images/logo3.png',
+                  width: 24,
+                  height: 24,
+                ),
+                SizedBox(width: 8),
+                Text('Tiếng Anh'),
+              ],
+            ),
           ),
           PopupMenuItem<String>(
             value: 'ja',
-            child: const Text('Tiếng Nhật'),
+            child: Row(
+              children: [
+                Image.network(
+                  'https://vjp-connect.com/images/logo4.png',
+                  width: 24,
+                  height: 24,
+                ),
+                SizedBox(width: 8),
+                Text('Tiếng Nhật'),
+              ],
+            ),
           ),
         ];
       },

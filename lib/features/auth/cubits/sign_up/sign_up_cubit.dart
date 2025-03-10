@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../services/api/api_service.dart';
 import 'sign_up_state.dart';
 import 'sign_up_event.dart';
+import '../../../../core/validators/auth_validator.dart';
 
 class SignUpCubit extends Bloc<SignUpEvent, SignUpState> {
   final ApiService _apiService;
@@ -31,54 +32,32 @@ class SignUpCubit extends Bloc<SignUpEvent, SignUpState> {
   }
 
   void _onEmailChanged(SignUpEmailChanged event, Emitter<SignUpState> emit) {
-    String emailError = '';
-
-    // Kiểm tra email bằng biểu thức chính quy
-    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-
-    if (event.email.isEmpty) {
-      emailError = 'Email không được để trống';
-    } else if (!emailRegex.hasMatch(event.email)) {
-      emailError = 'Email không đúng định dạng';
-    }
-
+    final emailError = AuthValidator.validateEmail(event.email) ?? '';
     emit(state.copyWith(
-        email: event.email,
-        emailError: emailError
+      email: event.email,
+      emailError: emailError
     ));
   }
 
   void _onPasswordChanged(SignUpPasswordChanged event, Emitter<SignUpState> emit) {
-    String passwordError = '';
-    String password = event.password;
-
-    // Biểu thức chính quy kiểm tra mật khẩu mạnh
-    final regex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$');
-
-    if (password.isEmpty) {
-      passwordError = 'Mật khẩu không được để trống';
-    } else if (!regex.hasMatch(password)) {
-      passwordError = 'Mật khẩu phải có ít nhất 6 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt';
-    }
-
+    final passwordError = AuthValidator.validatePassword(event.password) ?? '';
     emit(state.copyWith(
-      password: password,
+      password: event.password,
       passwordError: passwordError,
       // Kiểm tra lại xác nhận mật khẩu
-      confirmPasswordError: state.confirmPassword != password ? 'Mật khẩu không khớp' : '',
+      confirmPasswordError: AuthValidator.validateConfirmPassword(
+        event.password, 
+        state.confirmPassword
+      ) ?? '',
     ));
   }
 
   void _onConfirmPasswordChanged(SignUpConfirmPasswordChanged event, Emitter<SignUpState> emit) {
-    String confirmPasswordError = '';
-
-    // Kiểm tra xác nhận mật khẩu
-    if (event.confirmPassword.isEmpty) {
-      confirmPasswordError = 'Xác nhận mật khẩu không được để trống';
-    } else if (event.confirmPassword != state.password) {
-      confirmPasswordError = 'Mật khẩu không khớp';
-    }
-
+    final confirmPasswordError = AuthValidator.validateConfirmPassword(
+      state.password,
+      event.confirmPassword
+    ) ?? '';
+    
     emit(state.copyWith(
         confirmPassword: event.confirmPassword,
         confirmPasswordError: confirmPasswordError
@@ -152,5 +131,25 @@ class SignUpCubit extends Bloc<SignUpEvent, SignUpState> {
       emit(state.copyWith(isLoading: false, errorMessage: 'Có lỗi xảy ra, vui lòng thử lại!'));
       print('Error: $e');  // In lỗi để bạn có thể debug
     }
+  }
+
+  String _validateEmail(String email) {
+    return AuthValidator.validateEmail(email) ?? '';
+  }
+
+  String _validatePassword(String password) {
+    return AuthValidator.validatePassword(password) ?? '';
+  }
+
+  String _validateConfirmPassword(String confirmPassword) {
+    if (confirmPassword.trim().isEmpty) {
+      return "Xác nhận mật khẩu không được để trống!";
+    }
+    
+    if (confirmPassword != state.password) {
+      return "Mật khẩu xác nhận không khớp!";
+    }
+    
+    return '';
   }
 }

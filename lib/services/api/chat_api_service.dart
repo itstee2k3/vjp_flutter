@@ -68,14 +68,28 @@ class ChatApiService {
   }
 
   void _initializeHubListeners() {
-    // Xóa tất cả các đăng ký hiện có trước khi đăng ký mới
     hubConnection.off('ReceiveMessage');
     
     hubConnection.on('ReceiveMessage', (arguments) {
-      print('SignalR ReceiveMessage received: $arguments');
+      print('=== SignalR Message Debug ===');
+      print('Raw message: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
         try {
-          final message = Message.fromJson(arguments[0] as Map<String, dynamic>);
+          final messageData = arguments[0] as Map<String, dynamic>;
+          if (messageData.containsKey('sentAt')) {
+            final sentAtStr = messageData['sentAt'];
+            print('Original sentAt: $sentAtStr');
+            
+            final originalTime = DateTime.parse(sentAtStr);
+            print('Parsed time: $originalTime');
+            
+            messageData['sentAt'] = originalTime.toIso8601String();
+          }
+          
+          final message = Message.fromJson(messageData);
+          print('Final message time: ${message.sentAt}');
+          print('========================');
+          
           _messageController.add(message);
         } catch (e) {
           print('Error handling SignalR message: $e');
@@ -203,12 +217,12 @@ class ChatApiService {
         throw Exception('CurrentUserId is not set');
       }
 
-      // Tạo dữ liệu tin nhắn
+      // Không cần gửi thời gian lên server vì server sẽ tự set
       final messageData = {
         "senderId": currentUserId,
         "receiverId": receiverId,
         "content": content,
-        "sentAt": DateTime.now().toUtc().toIso8601String(),
+        // Bỏ trường sentAt vì server sẽ tự set
         "isRead": false,
       };
 

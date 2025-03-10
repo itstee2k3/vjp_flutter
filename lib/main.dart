@@ -8,6 +8,7 @@ import 'services/api/api_service.dart';
 import 'core/config/app_routes.dart';
 import 'features/auth/cubits/sign_in/sign_in_cubit.dart';
 import 'features/home/cubits/home_cubit.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +64,25 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.blue,
+          textTheme: GoogleFonts.robotoTextTheme(
+            Theme.of(context).textTheme,
+          ),
+          iconTheme: const IconThemeData(
+            color: Colors.black87,
+            size: 24.0,
+          ),
+          appBarTheme: const AppBarTheme(
+            iconTheme: IconThemeData(
+              color: Colors.white,
+              size: 24.0,
+            ),
+          ),
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            selectedItemColor: Colors.blue,
+            unselectedItemColor: Colors.grey,
+            selectedIconTheme: IconThemeData(size: 24.0),
+            unselectedIconTheme: IconThemeData(size: 24.0),
+          ),
         ),
         initialRoute: '/home',
         onGenerateRoute: AppRoutes.onGenerateRoute,
