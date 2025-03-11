@@ -45,32 +45,49 @@ class AuthState {
   }
 
   factory AuthState.fromJson(Map<String, dynamic> json) {
-    String? token = json['accessToken'];
-    if (token != null) {
-      final parts = token.split('.');
-      if (parts.length == 3) {
-        final payload = parts[1];
-        final normalized = base64Url.normalize(payload);
-        final payloadMap = jsonDecode(utf8.decode(base64Url.decode(normalized)));
-        
-        return AuthState(
-          isAuthenticated: true,
-          accessToken: token,
-          refreshToken: json['refreshToken'],
-          fullName: payloadMap['FullName'] ?? json['fullName'] ?? 'User',
-          email: payloadMap['email'] ?? json['email'] ?? '',
-          userId: payloadMap['sub'],
-        );
+    // Extract userId and other info from token if not provided directly
+    String? userId = json['userId'];
+    String? fullName = json['fullName'];
+    String? email = json['email'];
+
+    if (json['accessToken'] != null) {
+      try {
+        final parts = json['accessToken'].split('.');
+        if (parts.length == 3) {
+          final payload = parts[1];
+          final normalized = base64Url.normalize(payload);
+          final payloadMap = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+          
+          // print('Token payload: $payloadMap'); // Debug log để xem payload
+
+          // Get userId from token if not provided
+          userId = userId ?? 
+                  payloadMap['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'];
+          
+          // Get fullName from token if not provided
+          fullName = fullName ?? 
+                    payloadMap['FullName'] ??
+                    'User';
+          
+          // Get email from token if not provided
+          email = email ?? 
+                  payloadMap['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'];
+        }
+      } catch (e) {
+        print('Error extracting data from token: $e');
       }
     }
-    
+
+    // print('Parsed AuthState - fullName: $fullName, userId: $userId, email: $email');
+
     return AuthState(
-      isAuthenticated: true,
+      isAuthenticated: json['success'] ?? false,
       accessToken: json['accessToken'],
       refreshToken: json['refreshToken'],
-      fullName: json['fullName'] ?? 'User',
-      email: json['email'] ?? '',
-      userId: json['userId'],
+      fullName: fullName ?? 'User',
+      email: email,
+      userId: userId,
+      message: json['message'],
     );
   }
 

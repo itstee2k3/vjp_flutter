@@ -8,7 +8,7 @@ import '../../features/chat/models/message.dart';
 import 'package:logging/logging.dart' as logging;
 
 class ChatApiService {
-  final String? _token;
+  String? _token;
   String? get token => _token;
 
   String? _currentUserId;
@@ -285,4 +285,26 @@ class ChatApiService {
     "Content-Type": "application/json",
     "Authorization": "Bearer $token",
   };
+
+  void updateToken(String newToken) {
+    _token = newToken;
+    
+    // Cập nhật currentUserId từ token mới
+    try {
+      final parts = newToken.split('.');
+      if (parts.length == 3) {
+        final payload = parts[1];
+        final normalized = base64Url.normalize(payload);
+        final payloadMap = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+        _currentUserId = payloadMap['sub'];
+      }
+    } catch (e) {
+      print('Error updating token: $e');
+    }
+
+    // Reconnect SignalR với token mới
+    if (hubConnection.state == HubConnectionState.Connected) {
+      hubConnection.stop().then((_) => connect());
+    }
+  }
 }

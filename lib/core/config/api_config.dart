@@ -26,5 +26,6 @@ class ApiConfig {
   static String get loginUrl => '$baseUrl/api/auth/login';
   static String get registerUrl => '$baseUrl/api/auth/register';
   static String get logoutUrl => '$baseUrl/api/auth/logout';
+  static String get refreshTokenUrl => '$baseUrl/api/auth/refresh-token';
   // Thêm các endpoint khác nếu cần
 } 

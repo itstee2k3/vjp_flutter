@@ -125,4 +125,34 @@ class ApiService {
       };
     }
   }
+
+  Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
+    try {
+      final response = await dio.post(
+        '${ApiConfig.baseUrl}/api/auth/refresh-token',
+        data: {
+          'refreshToken': refreshToken,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'accessToken': response.data['accessToken'],
+          'refreshToken': response.data['refreshToken'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Không thể làm mới token',
+        };
+      }
+    } catch (e) {
+      print('Refresh token error: $e');
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối khi làm mới token',
+      };
+    }
+  }
 }

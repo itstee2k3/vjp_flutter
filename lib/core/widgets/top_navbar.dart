@@ -20,6 +20,13 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AuthCubit, auth.AuthState>(
       builder: (context, state) {
+        // Kiểm tra token khi build TopNavBar
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (state.isAuthenticated) {
+            context.read<AuthCubit>().checkAuthStatus();
+          }
+        });
+
         return AppBar(
           automaticallyImplyLeading: false,
           backgroundColor: Colors.yellow,
@@ -65,7 +72,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
       children: [
         _buildLanguageSelector(),
         const SizedBox(width: 16),
-        if (state.isAuthenticated) ...[
+        if (state.isAuthenticated && state.accessToken != null) ...[
           Text(
             state.fullName ?? 'User',
             style: const TextStyle(
