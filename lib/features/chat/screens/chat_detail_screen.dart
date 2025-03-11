@@ -278,21 +278,35 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              _formatTime(time),
-              style: TextStyle(
-                fontSize: 12,
-                color: isMe ? Colors.white70 : Colors.black54,
-              ),
-            ),
+            MessageTime(time: time, isMe: isMe),
           ],
         ),
       ),
     );
   }
+}
 
-  String _formatTime(DateTime time) {
-    final localTime = time.toLocal();
-    return '${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')}';
+class MessageTime extends StatelessWidget {
+  final DateTime time;
+  final bool isMe;
+
+  const MessageTime({
+    Key? key,
+    required this.time,
+    required this.isMe,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // Server đã trả về thời gian Việt Nam, chỉ cần format
+    final formattedTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+    return Text(
+      formattedTime,
+      style: TextStyle(
+        fontSize: 12,
+        color: isMe ? Colors.white70 : Colors.black54,
+      ),
+    );
   }
 } 

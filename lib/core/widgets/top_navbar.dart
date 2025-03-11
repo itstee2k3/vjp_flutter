@@ -8,18 +8,27 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoggedIn;
   final String? fullName;
   final VoidCallback? onLogout;
+  final bool showBackButton;
 
   const TopNavBar({
     Key? key,
     this.isLoggedIn = false,
     this.fullName,
     this.onLogout,
+    this.showBackButton = false,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AuthCubit, auth.AuthState>(
       builder: (context, state) {
+        // Kiểm tra token khi build TopNavBar
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (state.isAuthenticated) {
+            context.read<AuthCubit>().checkAuthStatus();
+          }
+        });
+
         return AppBar(
           automaticallyImplyLeading: false,
           backgroundColor: Colors.yellow,
@@ -29,6 +38,11 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
               children: [
+                if (showBackButton)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 _buildLogo(),
                 const Spacer(),
                 _buildUserActions(context, state),
@@ -65,7 +79,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
       children: [
         _buildLanguageSelector(),
         const SizedBox(width: 16),
-        if (state.isAuthenticated) ...[
+        if (state.isAuthenticated && state.accessToken != null) ...[
           Text(
             state.fullName ?? 'User',
             style: const TextStyle(
@@ -103,15 +117,48 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
         return [
           PopupMenuItem<String>(
             value: 'vi',
-            child: const Text('Tiếng Việt'),
+            child: Row(
+              children: [
+                Image.network(
+                  'https://vjp-connect.com/images/logo2.png',
+                  width: 24,
+                  height: 24,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.flag, color: Colors.red);
+                  },
+                ),
+                SizedBox(width: 8),
+                Text('Tiếng Việt'),
+              ],
+            ),
           ),
           PopupMenuItem<String>(
             value: 'en',
-            child: const Text('Tiếng Anh'),
+            child: Row(
+              children: [
+                Image.network(
+                  'https://vjp-connect.com/images/logo3.png',
+                  width: 24,
+                  height: 24,
+                ),
+                SizedBox(width: 8),
+                Text('Tiếng Anh'),
+              ],
+            ),
           ),
           PopupMenuItem<String>(
             value: 'ja',
-            child: const Text('Tiếng Nhật'),
+            child: Row(
+              children: [
+                Image.network(
+                  'https://vjp-connect.com/images/logo4.png',
+                  width: 24,
+                  height: 24,
+                ),
+                SizedBox(width: 8),
+                Text('Tiếng Nhật'),
+              ],
+            ),
           ),
         ];
       },

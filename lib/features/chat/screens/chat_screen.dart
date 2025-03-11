@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_socket_io/services/api/chat_api_service.dart';
-import '../models/story.dart';
+import '../../../data/models/story.dart';
+import '../../../data/models/user.dart';
+import '../../auth/cubits/auth_cubit.dart';
 import '../widgets/stories_list.dart';
 import '../widgets/messages_list.dart';
 import '../cubits/chat_cubit.dart';
@@ -10,6 +12,53 @@ import 'chat_detail_screen.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({Key? key}) : super(key: key);
+
+  Future<bool> _checkAuthAndGetToken(BuildContext context) async {
+    final authCubit = context.read<AuthCubit>();
+    await authCubit.checkAuthStatus();
+    
+    final state = authCubit.state;
+    if (!state.isAuthenticated || state.accessToken == null || state.userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phiên đăng nhập đã hết hạn')),
+      );
+      Navigator.pushReplacementNamed(context, '/');
+      return false;
+    }
+    return true;
+  }
+
+  void _handleUserTap(BuildContext context, User selectedUser) async {
+    if (!await _checkAuthAndGetToken(context)) return;
+
+    final authCubit = context.read<AuthCubit>();
+    final token = authCubit.state.accessToken;
+    final currentUserId = authCubit.state.userId;
+
+    // Double check to make TypeScript happy
+    if (token == null || currentUserId == null) return;
+
+    if (!context.mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BlocProvider(
+          create: (context) => ChatCubit(
+            ChatApiService(
+              token: token,
+              currentUserId: currentUserId,
+            ),
+            selectedUser.id,
+          ),
+          child: ChatDetailScreen(
+            username: selectedUser.fullName,
+            userId: selectedUser.id,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,25 +96,7 @@ class ChatScreen extends StatelessWidget {
                     final selectedUser = state.users.firstWhere(
                       (user) => user.fullName == story.username
                     );
-                    
-                    final chatService = context.read<ChatListCubit>().chatService;
-                    print('ChatService currentUserId: ${chatService.currentUserId}'); // Debug log
-                    
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => BlocProvider(
-                          create: (context) {
-                            final chatService = context.read<ChatListCubit>().chatService;
-                            return ChatCubit(chatService, selectedUser.id);
-                          },
-                          child: ChatDetailScreen(
-                            username: selectedUser.fullName,
-                            userId: selectedUser.id,
-                          ),
-                        ),
-                      ),
-                    );
+                    _handleUserTap(context, selectedUser);
                   },
                 ),
                 const Divider(height: 1),
@@ -77,25 +108,7 @@ class ChatScreen extends StatelessWidget {
                       final selectedUser = state.users.firstWhere(
                         (user) => user.fullName == story.username
                       );
-                      
-                      final chatService = context.read<ChatListCubit>().chatService;
-                      print('ChatService currentUserId: ${chatService.currentUserId}'); // Debug log
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BlocProvider(
-                            create: (context) {
-                              final chatService = context.read<ChatListCubit>().chatService;
-                              return ChatCubit(chatService, selectedUser.id);
-                            },
-                            child: ChatDetailScreen(
-                              username: selectedUser.fullName,
-                              userId: selectedUser.id,
-                            ),
-                          ),
-                        ),
-                      );
+                      _handleUserTap(context, selectedUser);
                     },
                   ),
                 ),

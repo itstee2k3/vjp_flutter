@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../models/user.dart';
+import '../../../data/models/user.dart';
 import '../../../services/api/chat_api_service.dart';
 import '../../../features/auth/cubits/auth_cubit.dart';
 import 'package:signalr_netcore/signalr_client.dart';
@@ -36,24 +36,20 @@ class ChatListState {
 
 // Cubit
 class ChatListCubit extends Cubit<ChatListState> {
-  ChatApiService _chatService;
-  final AuthCubit authCubit;
+  final ChatApiService _chatService;
+  final AuthCubit _authCubit;
   late StreamSubscription _authSubscription;
   Timer? _connectionCheckTimer;
 
-  ChatListCubit(this._chatService, {required this.authCubit}) : super(ChatListState()) {
+  ChatListCubit(this._chatService, {required AuthCubit authCubit})
+      : _authCubit = authCubit,
+        super(ChatListState()) {
     print('ChatListCubit initialized');
     
     // Đăng ký lắng nghe sự kiện đăng nhập/đăng xuất
-    _authSubscription = authCubit.stream.listen((authState) {
+    _authSubscription = _authCubit.stream.listen((authState) {
       if (authState.isAuthenticated && !state.isSocketConnected) {
         print('User authenticated, connecting SignalR');
-        _chatService = ChatApiService(
-          token: authState.accessToken,
-          currentUserId: authState.userId,
-        );
-        
-        // Kết nối SignalR
         _chatService.connect();
         emit(state.copyWith(isSocketConnected: true));
         
@@ -74,7 +70,7 @@ class ChatListCubit extends Cubit<ChatListState> {
     });
     
     // Kết nối ban đầu nếu đã xác thực
-    if (authCubit.state.isAuthenticated) {
+    if (_authCubit.state.isAuthenticated) {
       print('User already authenticated, connecting SignalR');
       _chatService.connect();
       emit(state.copyWith(isSocketConnected: true));
@@ -83,21 +79,42 @@ class ChatListCubit extends Cubit<ChatListState> {
     }
   }
 
-  ChatApiService get chatService => _chatService;
-
   Future<void> loadUsers() async {
     try {
-      emit(state.copyWith(isLoading: true));
+      emit(state.copyWith(isLoading: true, error: null));
+      
+      // Kiểm tra và refresh token nếu cần
+      await _authCubit.checkAuthStatus();
+      
+      // Lấy token mới sau khi refresh
+      final currentToken = _authCubit.state.accessToken;
+      if (currentToken == null) {
+        throw Exception('Token không hợp lệ');
+      }
+
+      // Cập nhật token mới cho ChatService
+      _chatService.updateToken(currentToken);
+
       final users = await _chatService.getUsers();
+      if (users.isEmpty) {
+        emit(state.copyWith(
+          isLoading: false,
+          error: 'Không tìm thấy người dùng nào',
+        ));
+        return;
+      }
+
       emit(state.copyWith(
         users: users,
         isLoading: false,
+        error: null,
       ));
     } catch (e) {
       print('Error loading users: $e');
       emit(state.copyWith(
-        error: e.toString(),
         isLoading: false,
+        error: 'Không thể tải danh sách người dùng: ${e.toString()}',
+        users: [], // Clear users list on error
       ));
     }
   }

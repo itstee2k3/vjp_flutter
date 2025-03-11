@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:signalr_netcore/signalr_client.dart';
-import '../../features/chat/models/user.dart';
-import '../../features/chat/models/message.dart';
+import '../../data/models/message.dart';
+import '../../data/models/user.dart';
 import 'package:logging/logging.dart' as logging;
 
 class ChatApiService {
-  final String? _token;
+  String? _token;
   String? get token => _token;
 
   String? _currentUserId;
@@ -68,14 +68,28 @@ class ChatApiService {
   }
 
   void _initializeHubListeners() {
-    // Xóa tất cả các đăng ký hiện có trước khi đăng ký mới
     hubConnection.off('ReceiveMessage');
     
     hubConnection.on('ReceiveMessage', (arguments) {
-      print('SignalR ReceiveMessage received: $arguments');
+      print('=== SignalR Message Debug ===');
+      print('Raw message: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
         try {
-          final message = Message.fromJson(arguments[0] as Map<String, dynamic>);
+          final messageData = arguments[0] as Map<String, dynamic>;
+          if (messageData.containsKey('sentAt')) {
+            final sentAtStr = messageData['sentAt'];
+            print('Original sentAt: $sentAtStr');
+
+            final originalTime = DateTime.parse(sentAtStr);
+            print('Parsed time: $originalTime');
+
+            messageData['sentAt'] = originalTime.toIso8601String();
+          }
+
+          final message = Message.fromJson(messageData);
+          print('Final message time: ${message.sentAt}');
+          print('========================');
+
           _messageController.add(message);
         } catch (e) {
           print('Error handling SignalR message: $e');
@@ -203,12 +217,12 @@ class ChatApiService {
         throw Exception('CurrentUserId is not set');
       }
 
-      // Tạo dữ liệu tin nhắn
+      // Không cần gửi thời gian lên server vì server sẽ tự set
       final messageData = {
         "senderId": currentUserId,
         "receiverId": receiverId,
         "content": content,
-        "sentAt": DateTime.now().toUtc().toIso8601String(),
+        // Bỏ trường sentAt vì server sẽ tự set
         "isRead": false,
       };
 
@@ -271,4 +285,26 @@ class ChatApiService {
     "Content-Type": "application/json",
     "Authorization": "Bearer $token",
   };
+
+  void updateToken(String newToken) {
+    _token = newToken;
+    
+    // Cập nhật currentUserId từ token mới
+    try {
+      final parts = newToken.split('.');
+      if (parts.length == 3) {
+        final payload = parts[1];
+        final normalized = base64Url.normalize(payload);
+        final payloadMap = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+        _currentUserId = payloadMap['sub'];
+      }
+    } catch (e) {
+      print('Error updating token: $e');
+    }
+
+    // Reconnect SignalR với token mới
+    if (hubConnection.state == HubConnectionState.Connected) {
+      hubConnection.stop().then((_) => connect());
+    }
+  }
 }

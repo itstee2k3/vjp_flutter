@@ -26,8 +26,40 @@ class AuthCubit extends Cubit<AuthState> {
     final refreshToken = prefs.getString(KEY_REFRESH_TOKEN);
     final userId = prefs.getString(KEY_USER_ID);
 
+    // print('Checking auth status...');
+    // print('Access token exists: ${accessToken != null}');
+    // print('Refresh token exists: ${refreshToken != null}');
+
     if (accessToken != null && refreshToken != null) {
-      // Tạo response map để parse thông tin từ token
+      // Kiểm tra token hết hạn
+      if (_isTokenExpired(accessToken)) {
+        print('Access token expired, attempting refresh...');
+        // Thử refresh token
+        try {
+          final newTokens = await _apiService.refreshToken(refreshToken);
+          if (newTokens['success']) {
+            print('Token refresh successful');
+            // Cập nhật token mới
+            await prefs.setString(KEY_ACCESS_TOKEN, newTokens['accessToken']);
+            await prefs.setString(KEY_REFRESH_TOKEN, newTokens['refreshToken']);
+            
+            emit(AuthState.fromJson(newTokens));
+            return;
+          } else {
+            print('Token refresh failed');
+          }
+        } catch (e) {
+          print('Error refreshing token: $e');
+        }
+        
+        print('Logging out due to invalid tokens...');
+        // Nếu refresh thất bại, logout
+        await logout();
+        return;
+      }
+
+      // print('Token still valid, maintaining session');
+      // Token còn hạn, emit state bình thường
       final response = {
         'success': true,
         'accessToken': accessToken,
@@ -36,6 +68,32 @@ class AuthCubit extends Cubit<AuthState> {
       };
 
       emit(AuthState.fromJson(response));
+    } else {
+      print('No tokens found, user not authenticated');
+      emit(AuthState());
+    }
+  }
+
+  bool _isTokenExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final payloadMap = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+      
+      final expiry = DateTime.fromMillisecondsSinceEpoch(payloadMap['exp'] * 1000);
+      final isExpired = DateTime.now().isAfter(expiry);
+      
+      // print('Token expiry time: $expiry');
+      // print('Current time: ${DateTime.now()}');
+      // print('Is token expired: $isExpired');
+      
+      return isExpired;
+    } catch (e) {
+      print('Error checking token expiry: $e');
+      return true;
     }
   }
 
@@ -44,21 +102,51 @@ class AuthCubit extends Cubit<AuthState> {
       final accessToken = response['accessToken'];
       print('Saving token: $accessToken'); // Debug log
 
+      // Parse token để lấy thông tin
+      String? fullName = response['fullName'];
+      String? email = response['email'];
+
       if (accessToken != null) {
+        try {
+          final parts = accessToken.split('.');
+          if (parts.length == 3) {
+            final payload = parts[1];
+            final normalized = base64Url.normalize(payload);
+            final payloadMap = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+            
+            // print('Token payload in loginSuccess: $payloadMap');
+            
+            // Get fullName from token if not provided in response
+            fullName = fullName ?? payloadMap['FullName'];
+            
+            // Get email from token if not provided in response
+            email = email ?? 
+                   payloadMap['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'];
+          }
+        } catch (e) {
+          print('Error parsing token: $e');
+        }
+
         await prefs.setString(KEY_ACCESS_TOKEN, accessToken);
+        if (fullName != null) {
+          print('Saving fullName: $fullName');
+          await prefs.setString(KEY_FULL_NAME, fullName);
+        }
+        if (email != null) {
+          await prefs.setString(KEY_EMAIL, email);
+        }
       }
+
       if (response['refreshToken'] != null) {
         await prefs.setString(KEY_REFRESH_TOKEN, response['refreshToken']);
       }
-      if (response['email'] != null) {
-        await prefs.setString(KEY_EMAIL, response['email']);
-      }
-      if (response['fullName'] != null) {
-        await prefs.setString(KEY_FULL_NAME, response['fullName']);
-      }
       
       // Tạo AuthState để trích xuất userId từ token
-      final authState = AuthState.fromJson(response);
+      final authState = AuthState.fromJson({
+        ...response,
+        'fullName': fullName,
+        'email': email,
+      });
       
       // Lưu userId nếu có
       if (authState.userId != null) {
@@ -66,10 +154,10 @@ class AuthCubit extends Cubit<AuthState> {
         print('Đã lưu userId: ${authState.userId}');
       }
 
+      print('Emitting AuthState with fullName: ${authState.fullName}');
       emit(authState);
     } catch (e) {
       print('Error in loginSuccess: $e');
-      // Emit default state if error occurs
       emit(AuthState(isAuthenticated: true));
     }
   }
