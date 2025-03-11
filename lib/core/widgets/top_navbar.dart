@@ -8,12 +8,14 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoggedIn;
   final String? fullName;
   final VoidCallback? onLogout;
+  final bool showBackButton;
 
   const TopNavBar({
     Key? key,
     this.isLoggedIn = false,
     this.fullName,
     this.onLogout,
+    this.showBackButton = false,
   }) : super(key: key);
 
   @override
@@ -36,6 +38,11 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(
               children: [
+                if (showBackButton)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 _buildLogo(),
                 const Spacer(),
                 _buildUserActions(context, state),

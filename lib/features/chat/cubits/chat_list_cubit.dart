@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../models/user.dart';
+import '../../../data/models/user.dart';
 import '../../../services/api/chat_api_service.dart';
 import '../../../features/auth/cubits/auth_cubit.dart';
 import 'package:signalr_netcore/signalr_client.dart';

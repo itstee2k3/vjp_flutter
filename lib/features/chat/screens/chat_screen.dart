@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_socket_io/services/api/chat_api_service.dart';
+import '../../../data/models/story.dart';
+import '../../../data/models/user.dart';
 import '../../auth/cubits/auth_cubit.dart';
-import '../models/story.dart';
-import '../models/user.dart';
 import '../widgets/stories_list.dart';
 import '../widgets/messages_list.dart';
 import '../cubits/chat_cubit.dart';

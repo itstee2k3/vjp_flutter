@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/story.dart';
+import '../../../data/models/story.dart';
 
 class StoriesList extends StatelessWidget {
   final List<Story> stories;

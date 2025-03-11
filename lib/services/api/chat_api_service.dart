@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:signalr_netcore/signalr_client.dart';
-import '../../features/chat/models/user.dart';
-import '../../features/chat/models/message.dart';
+import '../../data/models/message.dart';
+import '../../data/models/user.dart';
 import 'package:logging/logging.dart' as logging;
 
 class ChatApiService {
@@ -79,17 +79,17 @@ class ChatApiService {
           if (messageData.containsKey('sentAt')) {
             final sentAtStr = messageData['sentAt'];
             print('Original sentAt: $sentAtStr');
-            
+
             final originalTime = DateTime.parse(sentAtStr);
             print('Parsed time: $originalTime');
-            
+
             messageData['sentAt'] = originalTime.toIso8601String();
           }
-          
+
           final message = Message.fromJson(messageData);
           print('Final message time: ${message.sentAt}');
           print('========================');
-          
+
           _messageController.add(message);
         } catch (e) {
           print('Error handling SignalR message: $e');

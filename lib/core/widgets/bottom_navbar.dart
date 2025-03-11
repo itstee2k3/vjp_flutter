@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../features/home/cubits/home_cubit.dart';
+import '../../features/home/screens/home_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
-  const BottomNavBar({Key? key}) : super(key: key);
+  final int currentIndex;
+
+  const BottomNavBar({
+    Key? key,
+    this.currentIndex = 0, // Mặc định là trang Home
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +27,17 @@ class BottomNavBar extends StatelessWidget {
           unselectedItemColor: Colors.black87,
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
           onTap: (index) {
-            if (index == 1) {
+            if (index == 0) {
+              if (ModalRoute.of(context)?.settings.name != '/') {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const HomeScreen(),
+                    settings: const RouteSettings(name: '/'),
+                  ),
+                  (route) => false,
+                );
+              }
+            } else if (index == 1) {
               _showModal(context, "Tìm kiếm", ["Tìm Doanh Nghiệp", "Tìm Chuyên Gia"]);
             } else if (index == 2) {
               _showModal(context, "Sự kiện", ["Sắp diễn ra", "Đã tổ chức", "Đăng ký sự kiện"]);

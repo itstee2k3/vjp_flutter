@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../models/message.dart';
+import '../../../data/models/message.dart';
 import '../../../services/api/chat_api_service.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
@@ -105,7 +105,7 @@ class ChatCubit extends Cubit<ChatState> {
 
   void _startPeriodicSync() {
     _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _syncTimer = Timer.periodic(Duration(seconds: 30), (timer) {
       print('Performing periodic sync');
       syncMessages();
     });
