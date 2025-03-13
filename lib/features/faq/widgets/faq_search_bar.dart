@@ -1,27 +1,38 @@
 import 'package:flutter/material.dart';
 
 class FAQSearchBar extends StatelessWidget {
-  const FAQSearchBar({Key? key}) : super(key: key);
+  final Function(String)? onSearch;
+
+  const FAQSearchBar({
+    Key? key,
+    this.onSearch,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: 'Hãy nhập câu hỏi của bạn?',
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: IconButton(
-          icon: const Icon(Icons.chat),
-          onPressed: () {
-            // TODO: Mở VJP-Connect AI Chatbot
-          },
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.5),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: TextField(
+        onChanged: onSearch,
+        decoration: const InputDecoration(
+          hintText: 'Tìm kiếm câu hỏi...',
+          prefixIcon: Icon(Icons.search, color: Colors.blue),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
-      onChanged: (value) {
-        // TODO: Implement search
-      },
     );
   }
 } 

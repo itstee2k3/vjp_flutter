@@ -1,77 +1,71 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../data/models/faq.dart';
+import '../../../data/sample_data/faqs_data.dart';
 
 class FAQList extends StatelessWidget {
   const FAQList({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Replace with real data
-    final faqs = [
-      FAQ(
-        id: '45',
-        question: 'Làm thế nào để xử lý rào cản ngôn ngữ trong giao dịch kinh doanh?',
-        answer: '',
-        createdAt: DateTime.parse('2025-03-01'),
-      ),
-      FAQ(
-        id: '44',
-        question: 'Có những lĩnh vực nào tiềm năng cho hợp tác kinh tế giữa Việt Nam và Nhật Bản?',
-        answer: '',
-        createdAt: DateTime.parse('2025-03-01'),
-      ),
-      // Add more FAQs...
-    ];
-
-    return ListView.separated(
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: faqs.length,
-      separatorBuilder: (context, index) => const Divider(height: 1),
+      itemCount: faqItems.length,
       itemBuilder: (context, index) {
-        final faq = faqs[index];
-        return FAQItem(faq: faq);
+        final FAQ faq = faqItems[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 8,
+          shadowColor: Colors.black26,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.transparent, // Ẩn đường gạch dưới nội dung mở rộng
+            ),
+            child: ExpansionTile(
+              iconColor: Colors.blueAccent,
+              collapsedIconColor: Colors.blueAccent,
+              title: Text(
+                faq.question,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              subtitle: Text(
+                'Ngày tạo: ${DateFormat('dd/MM/yyyy').format(faq.createdAt)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(16),
+                    ),
+                  ),
+                  alignment: Alignment.topLeft,
+                  child: Text(
+                    faq.answer,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       },
     );
   }
 }
-
-class FAQItem extends StatelessWidget {
-  final FAQ faq;
-
-  const FAQItem({
-    Key? key,
-    required this.faq,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Câu hỏi#${faq.id}: ',
-            style: const TextStyle(
-              color: Colors.blue,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Expanded(
-            child: Text(faq.question),
-          ),
-        ],
-      ),
-      trailing: Text(
-        'Ngày tạo: ${faq.createdAt.day}/${faq.createdAt.month}/${faq.createdAt.year}',
-        style: const TextStyle(
-          fontSize: 12,
-          color: Colors.grey,
-        ),
-      ),
-      onTap: () {
-        // TODO: Navigate to FAQ detail
-      },
-    );
-  }
-} 

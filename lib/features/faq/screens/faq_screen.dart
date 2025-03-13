@@ -8,33 +8,37 @@ class FAQScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'FAQ',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            title: const Text('FAQ'),
+            centerTitle: true,
+            backgroundColor: Colors.white,
+            pinned: true,
+            elevation: 0,
+          ),
+          SliverToBoxAdapter(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Các câu hỏi thường gặp trong kết nối - giao thương Việt Nam - Nhật Bản',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue,
+                    ),
                   ),
-                ),
-                const Text(
-                  'Các câu hỏi thường gặp trong kết nối - giao thương Việt Nam - Nhật Bản',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const FAQSearchBar(),
-              ],
+                  const SizedBox(height: 16),
+                  const FAQSearchBar(),
+                ],
+              ),
             ),
           ),
-          const Expanded(
+          const SliverFillRemaining(
             child: FAQList(),
           ),
         ],

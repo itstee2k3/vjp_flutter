@@ -5,14 +5,14 @@ import '../../features/auth/cubits/auth_cubit.dart';
 import '../../features/auth/cubits/auth_state.dart' as auth;
 import '../../features/auth/screens/auth_screen.dart';
 
-class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
+class TopNavigation extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoggedIn;
   final String? fullName;
   final VoidCallback? onLogout;
   final bool showBackButton;
   final Widget? leading;
 
-  const TopNavBar({
+  const TopNavigation({
     Key? key,
     this.isLoggedIn = false,
     this.fullName,
