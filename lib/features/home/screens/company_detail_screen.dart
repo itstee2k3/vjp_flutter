@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/widgets/bottom_navbar.dart';
-import '../../../core/widgets/top_navbar.dart';
 import '../../../data/models/company.dart';
-import 'home_screen.dart';
 
 class CompanyDetailScreen extends StatelessWidget {
   final Company company;
@@ -14,29 +11,18 @@ class CompanyDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const HomeScreen(),
-            settings: const RouteSettings(name: '/'),
-          ),
-          (route) => false,
-        );
-        return false;
-      },
-      child: Scaffold(
-        // Thêm TopNavBar
-        appBar: const PreferredSize(
-          preferredSize: Size.fromHeight(kToolbarHeight),
-          child: TopNavBar(),
-        ),
-        
-        body: CustomScrollView(
+    return Scaffold(
+      body: SafeArea(
+        child: CustomScrollView(
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
+            // Thêm padding top để tạo khoảng cách với tai thỏ
+            const SliverPadding(
+              padding: EdgeInsets.only(top: 16),
+            ),
+            
             // Nội dung chi tiết
             SliverToBoxAdapter(
               child: Column(
@@ -127,11 +113,6 @@ class CompanyDetailScreen extends StatelessWidget {
               ),
             ),
           ],
-        ),
-        
-        // Thêm BottomNavBar
-        bottomNavigationBar: const BottomNavBar(
-          currentIndex: 0,
         ),
       ),
     );

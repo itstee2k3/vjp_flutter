@@ -3,12 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../features/auth/cubits/auth_cubit.dart';
 import '../../features/auth/cubits/auth_state.dart' as auth;
+import '../../features/auth/screens/auth_screen.dart';
 
 class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   final bool isLoggedIn;
   final String? fullName;
   final VoidCallback? onLogout;
   final bool showBackButton;
+  final Widget? leading;
 
   const TopNavBar({
     Key? key,
@@ -16,10 +18,13 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     this.fullName,
     this.onLogout,
     this.showBackButton = false,
+    this.leading,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final bool canPop = Navigator.of(context).canPop();
+
     return BlocBuilder<AuthCubit, auth.AuthState>(
       builder: (context, state) {
         // Kiểm tra token khi build TopNavBar
@@ -30,6 +35,9 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
         });
 
         return AppBar(
+          leading: leading ?? (canPop ? BackButton(
+            onPressed: () => Navigator.of(context).pop(),
+          ) : null),
           automaticallyImplyLeading: false,
           backgroundColor: Colors.yellow,
           elevation: 1,
@@ -93,17 +101,16 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.logout, color: Colors.black87),
             onPressed: () {
               context.read<AuthCubit>().logout();
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/',
-                (route) => false,
-              );
             },
           ),
         ] else
           _buildActionButton(
             title: "Đăng Nhập",
             color: Colors.red,
-            onPressed: () => Navigator.pushNamed(context, '/'),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AuthScreen()),
+            ),
           ),
       ],
     );

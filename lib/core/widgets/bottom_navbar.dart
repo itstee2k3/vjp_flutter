@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../features/home/cubits/home_cubit.dart';
 import '../../features/home/screens/home_screen.dart';
+import '../../features/faq/screens/faq_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -44,7 +45,12 @@ class BottomNavBar extends StatelessWidget {
             } else if (index == 3) {
               _showModal(context, "Về Chúng Tôi", ["Giới thiệu", "Sứ mệnh", "Đội ngũ", "Liên hệ"]);
             } else if (index == 4) {
-              _showModal(context, "FAQ", ["Câu hỏi thường gặp", "Hỗ trợ khách hàng"]);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const FAQScreen(),
+                ),
+              );
             } else {
               context.read<HomeCubit>().changeTab(index);
             }

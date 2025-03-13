@@ -3,16 +3,26 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../widgets/custom_input_field.dart';
 import '../cubits/sign_in/sign_in_cubit.dart';
 import '../cubits/sign_in/sign_in_state.dart';
+import '../cubits/auth_cubit.dart';
 
 class SignInForm extends StatelessWidget {
   const SignInForm({Key? key}) : super(key: key);
 
   @override 
   Widget build(BuildContext context) {
-    final signInCubit = context.read<SignInCubit>();
+    final signInCubit = context.watch<SignInCubit>();
 
     return BlocConsumer<SignInCubit, SignInState>(
-      listener: _handleStateChanges,
+      listener: (context, state) {
+        // if (state.errorMessage.isNotEmpty) {
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //     SnackBar(
+        //       content: Text(state.errorMessage),
+        //       backgroundColor: Colors.red,
+        //     ),
+        //   );
+        // }
+      },
       builder: (context, state) {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 500),
@@ -27,83 +37,55 @@ class SignInForm extends StatelessWidget {
                 "Đăng Nhập",
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 10),
-              
+              const SizedBox(height: 24),
               CustomInputField(
                 label: "Email",
                 onChanged: signInCubit.onEmailChanged,
                 errorText: state.emailError,
               ),
-              
-              const SizedBox(height: 10),
-              
+              const SizedBox(height: 16),
               CustomInputField(
-                label: "Mật khẩu", 
+                label: "Mật khẩu",
                 onChanged: signInCubit.onPasswordChanged,
                 errorText: state.passwordError,
                 obscureText: true,
               ),
 
               if (state.errorMessage.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Text(
-                    state.errorMessage,
-                    style: const TextStyle(color: Colors.red)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  state.errorMessage,
+                  style: const TextStyle(color: Colors.red)
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              state.isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                onPressed: signInCubit.signIn,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepOrange,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-
-              const SizedBox(height: 20),
-              
-              state.isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: signInCubit.signIn,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepOrange,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20.0),
-                      child: Text(
-                        "GO!",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
-                      ),
-                    ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Text(
+                    "GO!",
+                    style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
+                ),
+              ),
             ],
           ),
         );
       },
     );
-  }
-
-  void _handleStateChanges(BuildContext context, SignInState state) {
-    if (state.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.message ?? 'Đăng nhập thành công'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      Future.delayed(const Duration(seconds: 1), () {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/home',
-          (route) => false,
-        );
-      });
-    } else if (state.errorMessage.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   BoxDecoration _buildContainerDecoration() {

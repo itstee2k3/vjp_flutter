@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../data/models/company.dart';
 import '../../../data/sample_data/companies_data.dart';
 import '../../../features/home/screens/company_detail_screen.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../main/cubits/main_cubit.dart';
 
 class CompanyVnWidget extends StatefulWidget {
   const CompanyVnWidget({Key? key}) : super(key: key);
@@ -271,22 +274,14 @@ class _CompanyVnWidgetState extends State<CompanyVnWidget> with TickerProviderSt
                                         color: Colors.transparent,
                                         child: InkWell(
                                           onTap: () {
-                                            setState(() {
-                                              _isHovering[company.id] = true;
-                                            });
-                                            
-                                            Future.delayed(const Duration(milliseconds: 150), () {
-                                              setState(() {
-                                                _isHovering[company.id] = false;
-                                              });
-                                              Navigator.pushReplacement(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) => CompanyDetailScreen(company: company),
-                                                ),
-                                              );
-                                            });
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => CompanyDetailScreen(company: company),
+                                              ),
+                                            );
                                           },
+
                                           splashColor: const Color(0xFF002C90).withOpacity(0.1),
                                           highlightColor: const Color(0xFF002C90).withOpacity(0.05),
                                           borderRadius: BorderRadius.circular(8),

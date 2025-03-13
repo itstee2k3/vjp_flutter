@@ -1,14 +1,17 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_socket_io/features/auth/cubits/auth_cubit.dart';
 import '../../../../services/api/api_service.dart';
 import 'sign_in_state.dart';
 import '../../../../core/validators/auth_validator.dart';
+import '../../../main/screens/main_screen.dart';
 
 class SignInCubit extends Cubit<SignInState> {
   final ApiService _apiService;
   final AuthCubit _authCubit;
+  final BuildContext context;
 
-  SignInCubit(this._apiService, this._authCubit) : super(const SignInState());
+  SignInCubit(this._apiService, this._authCubit, this.context) : super(const SignInState());
 
   void onEmailChanged(String email) {
     final emailTrimmed = email.trim();
@@ -46,6 +49,14 @@ class SignInCubit extends Cubit<SignInState> {
           isSuccess: true,
           message: result['message'],
         ));
+        
+        // Chuyển đến trang chính sau khi đăng nhập thành công
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const MainScreen(),
+          ),
+          (route) => false,
+        );
       } else {
         emit(state.copyWith(
           isLoading: false,

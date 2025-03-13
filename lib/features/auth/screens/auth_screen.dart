@@ -26,8 +26,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final apiService = ApiService();
     final authCubit = context.read<AuthCubit>();
+    final apiService = context.read<ApiService>();
 
     return Scaffold(
       body: Stack(
@@ -42,7 +42,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: const SignUpForm(),
                     )
                   : BlocProvider(
-                      create: (context) => SignInCubit(apiService, authCubit),
+                      create: (context) => SignInCubit(apiService, authCubit, context),
                       child: const SignInForm(),
                     ),
             ),
