@@ -27,21 +27,23 @@ class _SearchWidgetState extends State<SearchWidget> {
           const SizedBox(height: 15),
 
           // Ô tìm kiếm
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextField(
-              controller: _searchController,
-
-              decoration: const InputDecoration(
-                hintText: 'Tìm kiếm doanh nghiệp...',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 15),
+          Material(
+            color: Colors.transparent,
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
               ),
-              onSubmitted: widget.onSearch,
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Tìm kiếm doanh nghiệp...',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 15),
+                ),
+                onSubmitted: widget.onSearch,
+              ),
             ),
           ),
 

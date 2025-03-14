@@ -80,10 +80,8 @@ class ChatApiService {
             final sentAtStr = messageData['sentAt'];
             print('Original sentAt: $sentAtStr');
 
-            final originalTime = DateTime.parse(sentAtStr);
-            print('Parsed time: $originalTime');
-
-            messageData['sentAt'] = originalTime.toIso8601String();
+            // Giữ nguyên thời gian gốc từ server
+            messageData['sentAt'] = sentAtStr;
           }
 
           final message = Message.fromJson(messageData);
@@ -103,6 +101,25 @@ class ChatApiService {
   }
 
   Future<void> connect() async {
+    // Kiểm tra trạng thái hiện tại
+    if (hubConnection.state == HubConnectionState.Connected) {
+      print('SignalR already connected');
+      return;
+    }
+
+    // Nếu đang trong trạng thái kết nối hoặc reconnecting, đợi cho đến khi hoàn tất
+    if (hubConnection.state == HubConnectionState.Connecting || 
+        hubConnection.state == HubConnectionState.Reconnecting) {
+      print('SignalR is already trying to connect...');
+      return;
+    }
+
+    // Nếu đang trong trạng thái ngắt kết nối, đợi cho đến khi hoàn tất
+    if (hubConnection.state == HubConnectionState.Disconnecting) {
+      print('Waiting for disconnection to complete...');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
     try {
       print('Connecting to SignalR...');
       await hubConnection.start();
@@ -112,18 +129,28 @@ class ChatApiService {
         print('Joining room for user: $currentUserId');
         await hubConnection.invoke('JoinRoom', args: [currentUserId!]);
         print('Joined room successfully');
-        
-        // Thêm log để kiểm tra
-        print('Connection ID: ${hubConnection.connectionId}');
       }
     } catch (e) {
       print('Error connecting to SignalR: $e');
+      // Nếu có lỗi, đảm bảo dừng kết nối hiện tại
+      try {
+        await hubConnection.stop();
+      } catch (stopError) {
+        print('Error stopping connection: $stopError');
+      }
+      rethrow;
     }
   }
 
-  void disconnect() {
-    print('Disconnecting SignalR...');
-    hubConnection.stop();
+  Future<void> disconnect() async {
+    if (hubConnection.state != HubConnectionState.Disconnected) {
+      try {
+        await hubConnection.stop();
+        print('SignalR disconnected');
+      } catch (e) {
+        print('Error disconnecting from SignalR: $e');
+      }
+    }
   }
 
   Future<List<User>> getUsers() async {
@@ -210,69 +237,39 @@ class ChatApiService {
   }
 
   Future<void> sendMessage(String receiverId, String content) async {
-    print('ChatApiService.sendMessage called');
-
     try {
       if (currentUserId == null) {
         throw Exception('CurrentUserId is not set');
       }
 
-      // Không cần gửi thời gian lên server vì server sẽ tự set
       final messageData = {
         "senderId": currentUserId,
         "receiverId": receiverId,
         "content": content,
-        // Bỏ trường sentAt vì server sẽ tự set
         "isRead": false,
       };
 
       // Đảm bảo kết nối trước khi gửi tin nhắn
-      final isConnected = await ensureConnected();
-      
-      // Gửi tin nhắn qua SignalR trước nếu đã kết nối
-      if (isConnected) {
-        try {
-          await hubConnection.invoke('SendMessage', args: [messageData]);
-          print('Sent message via SignalR first for immediate display');
-        } catch (e) {
-          print('Error sending message via SignalR: $e');
-        }
+      if (hubConnection.state != HubConnectionState.Connected) {
+        await connect();
       }
 
-      // Gửi tin nhắn qua API REST (song song với SignalR)
+      // Gửi tin nhắn qua SignalR
+      await hubConnection.invoke('SendMessage', args: [messageData]);
+
+      // Gửi tin nhắn qua API REST
       final response = await http.post(
         Uri.parse("$baseUrl$chatSendEndpoint"),
         headers: _headers,
         body: jsonEncode(messageData),
       );
 
-      print('API response: ${response.statusCode} - ${response.body}');
-
-      if (response.statusCode == 200) {
-        // Thêm ID vào messageData nếu có
-        try {
-          final responseData = jsonDecode(response.body);
-          if (responseData.containsKey('data') && responseData['data'] is Map) {
-            final messageId = responseData['data']['id'];
-            if (messageId != null) {
-              messageData['id'] = messageId;
-              
-              // Gửi lại tin nhắn với ID nếu kết nối SignalR tốt
-              if (hubConnection.state == HubConnectionState.Connected) {
-                await hubConnection.invoke('SendMessage', args: [messageData]);
-                print('Sent message with ID via SignalR');
-              }
-            }
-          }
-        } catch (e) {
-          print('Error processing API response: $e');
-        }
-      } else {
-        throw Exception('Failed to send message: ${response.statusCode}');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to send message');
       }
     } catch (e) {
-      print('Error in ChatApiService.sendMessage: $e');
-      throw Exception('Error sending message: $e');
+      print('Error sending message: $e');
+      throw e;
     }
   }
 

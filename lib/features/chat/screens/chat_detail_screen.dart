@@ -24,53 +24,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<ChatState>? _chatSubscription;
-  Timer? _connectionCheckTimer;
+  late final ChatCubit _chatCubit;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    print('ChatDetailScreen initialized for user: ${widget.userId}');
-
-    // Kiểm tra kết nối SignalR
-    final chatCubit = context.read<ChatCubit>();
-    if (chatCubit.chatService.hubConnection.state != HubConnectionState.Connected) {
-      print('SignalR not connected in ChatDetailScreen, connecting...');
-      chatCubit.chatService.connect();
+    
+    _chatCubit = context.read<ChatCubit>();
+    if (_chatCubit.chatService.hubConnection.state != HubConnectionState.Connected) {
+      _chatCubit.chatService.connect();
     }
 
-    // Đồng bộ tin nhắn khi vào màn hình
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      chatCubit.syncMessages();
-    });
-
-    _chatSubscription?.cancel();
-    
-    _chatSubscription = context.read<ChatCubit>().stream.listen((state) {
-      if (state.messages.isNotEmpty) {
+    _chatSubscription = _chatCubit.stream.listen((state) {
+      if (state.messages.isNotEmpty && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToBottom();
         });
-      }
-    });
-
-    // Thêm kiểm tra kết nối định kỳ
-    _startConnectionCheck();
-
-    // Thêm lắng nghe sự kiện từ máy chủ
-    chatCubit.chatService.hubConnection.on('NewMessageNotification', (arguments) {
-      print('Received NewMessageNotification, syncing messages immediately');
-      chatCubit.syncMessages();
-    });
-  }
-
-  void _startConnectionCheck() {
-    _connectionCheckTimer?.cancel();
-    _connectionCheckTimer = Timer.periodic(Duration(seconds: 10), (timer) async {
-      final chatCubit = context.read<ChatCubit>();
-      if (chatCubit.chatService.hubConnection.state != HubConnectionState.Connected) {
-        print('Periodic check in ChatDetailScreen: SignalR not connected, reconnecting...');
-        await chatCubit.chatService.connect();
       }
     });
   }
@@ -81,30 +51,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
     _messageController.dispose();
     _scrollController.dispose();
     _chatSubscription?.cancel();
-    _connectionCheckTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    
     if (state == AppLifecycleState.resumed) {
-      print('App resumed, syncing messages');
-      final chatCubit = context.read<ChatCubit>();
-      chatCubit.syncMessages();
-      
-      // Kiểm tra kết nối SignalR
-      if (chatCubit.chatService.hubConnection.state != HubConnectionState.Connected) {
-        print('App resumed: SignalR not connected, reconnecting...');
-        chatCubit.chatService.connect();
+      if (_chatCubit.chatService.hubConnection.state != HubConnectionState.Connected) {
+        _chatCubit.chatService.connect();
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final chatCubit = context.read<ChatCubit>();
-    final currentUserId = chatCubit.chatService.currentUserId;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.username),
@@ -126,10 +88,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
             icon: Icon(Icons.sync),
             onPressed: () {
               final chatCubit = context.read<ChatCubit>();
-              chatCubit.syncMessages();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Đang đồng bộ tin nhắn...')),
-              );
+              chatCubit.loadMessages();
             },
           ),
         ],
@@ -137,30 +96,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
       body: Column(
         children: [
           Expanded(
-            child: BlocConsumer<ChatCubit, ChatState>(
-              listener: (context, state) {
-                // Auto scroll when new message arrives
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  }
-                });
-              },
+            child: BlocBuilder<ChatCubit, ChatState>(
               builder: (context, state) {
                 if (state.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
+
+                if (state.messages.isEmpty) {
+                  return const Center(child: Text('Chưa có tin nhắn nào'));
+                }
+
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(8),
                   itemCount: state.messages.length,
                   itemBuilder: (context, index) {
                     final message = state.messages[index];
-                    final isMe = message.senderId == currentUserId;
+                    final isMe = message.senderId == _chatCubit.chatService.currentUserId;
                     
                     return MessageBubble(
                       message: message.content,
@@ -216,7 +168,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
     }
@@ -298,8 +250,10 @@ class MessageTime extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Server đã trả về thời gian Việt Nam, chỉ cần format
-    final formattedTime = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    // Format thời gian theo múi giờ địa phương
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    final formattedTime = '$hour:$minute';
 
     return Text(
       formattedTime,

@@ -31,28 +31,23 @@ class ApiService {
         },
       );
 
-      final data = response.data;
-
-      if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'message': data['message'],
-          'accessToken': data['accessToken'],
-          'refreshToken': data['refreshToken'],
-          'fullName': data['fullName'] ?? 'User',
-        };
-      } else {
+      return {
+        'success': true,
+        'accessToken': response.data['accessToken'],
+        'refreshToken': response.data['refreshToken'],
+        'userId': response.data['userId'],
+      };
+    } catch (e) {
+      if (e is DioException) {
+        // Lấy message từ response error
+        final errorMessage = e.response?.data['message'] ?? 'Đã có lỗi xảy ra';
+        
         return {
           'success': false,
-          'message': data['message'] ?? 'Đăng nhập thất bại',
+          'message': errorMessage,
         };
       }
-    } catch (e) {
-      print('Login error: $e');
-      return {
-        'success': false,
-        'message': 'Lỗi kết nối: ${e.toString()}',
-      };
+      rethrow;
     }
   }
 
@@ -68,26 +63,25 @@ class ApiService {
         },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {
-          'success': true,
-          'message': response.data['message'] ?? 'Đăng ký thành công',
-          'data': response.data
-        };
-      } else {
+      return {
+        'success': true,
+        'message': response.data['message'] ?? 'Đăng ký thành công',
+        'data': response.data
+      };
+    } catch (e) {
+      if (e is DioException) {
+        // Lấy message từ response nếu có, nếu không có thì trả về lỗi mặc định
+        final errorMessage = e.response?.data['message'] ?? 'Đã có lỗi xảy ra';
+
         return {
           'success': false,
-          'message': response.data['message'] ?? 'Đăng ký thất bại'
+          'message': errorMessage,
         };
       }
-    } catch (e) {
-      print('Register error: $e');
-      return {
-        'success': false,
-        'message': 'Lỗi kết nối: ${e.toString()}'
-      };
+      rethrow;
     }
   }
+
 
   // Đăng xuất
   Future<Map<String, dynamic>> logout(String accessToken, String refreshToken) async {

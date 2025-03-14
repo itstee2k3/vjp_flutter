@@ -1,18 +1,18 @@
 class Message {
-  final int? id;
+  final int id;
   final String senderId;
   final String receiverId;
   final String content;
   final DateTime sentAt;
   final bool isRead;
 
-  const Message({
-    this.id,
+  Message({
+    required this.id,
     required this.senderId,
     required this.receiverId,
     required this.content,
     required this.sentAt,
-    this.isRead = false,
+    required this.isRead,
   });
 
   Message copyWith({
@@ -34,29 +34,37 @@ class Message {
   }
 
   factory Message.fromJson(Map<String, dynamic> json) {
-    final sentAtStr = json['sentAt'];
-    final time = DateTime.parse(sentAtStr);
-    
+    DateTime parsedTime;
+    if (json['sentAt'] is String) {
+      final sentAtStr = json['sentAt'] as String;
+      if (sentAtStr.contains('+')) {
+        final parts = sentAtStr.split('+');
+        final timeStr = parts[0];
+        parsedTime = DateTime.parse(timeStr);
+      } else {
+        parsedTime = DateTime.parse(sentAtStr);
+      }
+    } else {
+      parsedTime = DateTime.now();
+    }
+
     return Message(
-      id: json['id'],
-      senderId: json['senderId'],
-      receiverId: json['receiverId'],
-      content: json['content'],
-      sentAt: time,
+      id: json['id'] ?? 0,
+      senderId: json['senderId'] ?? '',
+      receiverId: json['receiverId'] ?? '',
+      content: json['content'] ?? '',
+      sentAt: parsedTime,
       isRead: json['isRead'] ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
-    final utcTime = sentAt.toUtc();
-    print('Converting to JSON, UTC time: $utcTime'); // Debug log
-    
     return {
       'id': id,
       'senderId': senderId,
       'receiverId': receiverId,
       'content': content,
-      'sentAt': utcTime.toIso8601String(),
+      'sentAt': sentAt.toIso8601String(),
       'isRead': isRead,
     };
   }

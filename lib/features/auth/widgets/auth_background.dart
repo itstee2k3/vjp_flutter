@@ -28,7 +28,7 @@ class AuthBackground extends StatelessWidget {
     return AnimatedPositioned(
       duration: Duration(milliseconds: 500),
       curve: Curves.easeInOut,
-      bottom: isRegistering ? 545 : -50,
+      bottom: isRegistering ? 565 : -50,
       left: 0,
       right: 0,
       height: 400,

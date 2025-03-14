@@ -103,7 +103,7 @@ class AuthCubit extends Cubit<AuthState> {
       print('Saving token: $accessToken'); // Debug log
 
       // Parse token để lấy thông tin
-      String? fullName = response['fullName'];
+      String? fullName = response['FullName'];
       String? email = response['email'];
 
       if (accessToken != null) {
