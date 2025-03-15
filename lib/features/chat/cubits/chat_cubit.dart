@@ -44,13 +44,34 @@ class ChatCubit extends Cubit<ChatState> {
     
     // Kiểm tra kết nối SignalR
     if (_chatService.hubConnection.state != HubConnectionState.Connected) {
+      print("⚠️ SignalR chưa kết nối. Đang kết nối lại...");
+
       _chatService.connect();
     }
-    
+
+
+    print("✅ SignalR trạng thái: ${_chatService.hubConnection.state}");
+
     // Lắng nghe tin nhắn mới từ SignalR
     _messageSubscription = _chatService.messageStream.listen((message) {
-      if (message.senderId == receiverId || message.receiverId == receiverId) {
-        _handleNewMessage(message);
+      final currentUserId = _chatService.currentUserId;
+      
+      // Chỉ xử lý tin nhắn liên quan đến cuộc trò chuyện hiện tại
+      if (currentUserId != null && 
+          ((message.senderId == currentUserId && message.receiverId == receiverId) ||
+           (message.receiverId == currentUserId && message.senderId == receiverId))) {
+        
+        // Tạo ID duy nhất cho tin nhắn để tránh trùng lặp
+        final messageId = '${message.id}-${message.senderId}-${message.content}-${message.sentAt.millisecondsSinceEpoch}';
+        
+        // Kiểm tra xem tin nhắn đã được xử lý chưa
+        if (!_processedMessageIds.contains(messageId)) {
+          _processedMessageIds.add(messageId);
+          _handleNewMessage(message);
+          print('Processed new message: $messageId');
+        } else {
+          print('Skipped duplicate message: $messageId');
+        }
       }
     });
     
@@ -143,6 +164,12 @@ class ChatCubit extends Cubit<ChatState> {
       // Sắp xếp tin nhắn theo thời gian tăng dần
       messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       
+      // Thêm tất cả ID tin nhắn vào danh sách đã xử lý
+      for (var message in messages) {
+        final messageId = '${message.id}-${message.senderId}-${message.content}-${message.sentAt.millisecondsSinceEpoch}';
+        _processedMessageIds.add(messageId);
+      }
+      
       emit(state.copyWith(
         messages: messages,
         isLoading: false,
@@ -156,6 +183,7 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   void resetAndReloadMessages() {
+    _processedMessageIds.clear();
     emit(ChatState());
     loadMessages();
   }

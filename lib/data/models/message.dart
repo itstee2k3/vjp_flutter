@@ -34,27 +34,69 @@ class Message {
   }
 
   factory Message.fromJson(Map<String, dynamic> json) {
-    DateTime parsedTime;
-    if (json['sentAt'] is String) {
-      final sentAtStr = json['sentAt'] as String;
-      if (sentAtStr.contains('+')) {
-        final parts = sentAtStr.split('+');
-        final timeStr = parts[0];
-        parsedTime = DateTime.parse(timeStr);
-      } else {
-        parsedTime = DateTime.parse(sentAtStr);
+    // Xử lý trường id - có thể là int hoặc không tồn tại
+    int messageId = 0;
+    if (json.containsKey('id')) {
+      if (json['id'] is int) {
+        messageId = json['id'];
+      } else if (json['id'] is String) {
+        try {
+          messageId = int.parse(json['id']);
+        } catch (e) {
+          print('Error parsing id: ${json['id']}');
+        }
       }
-    } else {
-      parsedTime = DateTime.now();
+    } else if (json.containsKey('Id')) {
+      // Trường hợp API trả về với chữ cái đầu viết hoa
+      if (json['Id'] is int) {
+        messageId = json['Id'];
+      } else if (json['Id'] is String) {
+        try {
+          messageId = int.parse(json['Id']);
+        } catch (e) {
+          print('Error parsing Id: ${json['Id']}');
+        }
+      }
     }
 
+    // Xử lý trường sentAt - có thể là String hoặc không tồn tại
+    DateTime messageSentAt = DateTime.now();
+    if (json.containsKey('sentAt')) {
+      if (json['sentAt'] is String) {
+        try {
+          // Chuyển đổi thời gian từ UTC sang giờ địa phương
+          messageSentAt = DateTime.parse(json['sentAt']).toLocal();
+          print('Parsed sentAt: ${json['sentAt']} to local: $messageSentAt');
+        } catch (e) {
+          print('Error parsing sentAt: ${json['sentAt']}');
+        }
+      }
+    } else if (json.containsKey('SentAt')) {
+      // Trường hợp API trả về với chữ cái đầu viết hoa
+      if (json['SentAt'] is String) {
+        try {
+          // Chuyển đổi thời gian từ UTC sang giờ địa phương
+          messageSentAt = DateTime.parse(json['SentAt']).toLocal();
+          print('Parsed SentAt: ${json['SentAt']} to local: $messageSentAt');
+        } catch (e) {
+          print('Error parsing SentAt: ${json['SentAt']}');
+        }
+      }
+    }
+
+    // Xử lý các trường khác - có thể viết thường hoặc viết hoa
+    String senderId = json['senderId'] ?? json['SenderId'] ?? '';
+    String receiverId = json['receiverId'] ?? json['ReceiverId'] ?? '';
+    String content = json['content'] ?? json['Content'] ?? '';
+    bool isRead = json['isRead'] ?? json['IsRead'] ?? false;
+
     return Message(
-      id: json['id'] ?? 0,
-      senderId: json['senderId'] ?? '',
-      receiverId: json['receiverId'] ?? '',
-      content: json['content'] ?? '',
-      sentAt: parsedTime,
-      isRead: json['isRead'] ?? false,
+      id: messageId,
+      senderId: senderId,
+      receiverId: receiverId,
+      content: content,
+      sentAt: messageSentAt,
+      isRead: isRead,
     );
   }
 

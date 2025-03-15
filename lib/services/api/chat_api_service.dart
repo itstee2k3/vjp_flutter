@@ -25,6 +25,16 @@ class ChatApiService {
   final _messageController = StreamController<Message>.broadcast();
   Stream<Message> get messageStream => _messageController.stream;
 
+  final _connectionStatusController = StreamController<bool>.broadcast();
+  Stream<bool> get connectionStatus => _connectionStatusController.stream;
+
+  // Thêm Set để theo dõi tin nhắn đã xử lý
+  final Set<String> _processedMessageIds = {};
+
+  // Thêm StreamController để theo dõi trạng thái đang nhập
+  final _typingStatusController = StreamController<Map<String, bool>>.broadcast();
+  Stream<Map<String, bool>> get typingStatus => _typingStatusController.stream;
+
   ChatApiService({
     String? token,
     String? currentUserId,
@@ -71,33 +81,98 @@ class ChatApiService {
     hubConnection.off('ReceiveMessage');
     
     hubConnection.on('ReceiveMessage', (arguments) {
-      print('=== SignalR Message Debug ===');
-      print('Raw message: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
         try {
           final messageData = arguments[0] as Map<String, dynamic>;
-          if (messageData.containsKey('sentAt')) {
-            final sentAtStr = messageData['sentAt'];
-            print('Original sentAt: $sentAtStr');
-
-            // Giữ nguyên thời gian gốc từ server
-            messageData['sentAt'] = sentAtStr;
+          
+          // Kiểm tra dữ liệu tin nhắn cơ bản
+          if (!messageData.containsKey('senderId') && !messageData.containsKey('SenderId')) {
+            print('Invalid message data: missing senderId');
+            return;
           }
-
-          final message = Message.fromJson(messageData);
-          print('Final message time: ${message.sentAt}');
-          print('========================');
-
-          _messageController.add(message);
+          
+          if (!messageData.containsKey('receiverId') && !messageData.containsKey('ReceiverId')) {
+            print('Invalid message data: missing receiverId');
+            return;
+          }
+          
+          // Log thời gian từ server
+          if (messageData.containsKey('sentAt')) {
+            print('Server sentAt: ${messageData['sentAt']}');
+          } else if (messageData.containsKey('SentAt')) {
+            print('Server SentAt: ${messageData['SentAt']}');
+          }
+          
+          try {
+            final message = Message.fromJson(messageData);
+            
+            // Log thời gian sau khi parse
+            print('Parsed sentAt: ${message.sentAt}, local time: ${message.sentAt.toLocal()}, UTC time: ${message.sentAt.toUtc()}');
+            
+            // Tạo ID duy nhất cho tin nhắn để tránh trùng lặp
+            final messageKey = '${message.id}-${message.senderId}-${message.receiverId}';
+            
+            // Kiểm tra xem tin nhắn đã được xử lý chưa
+            if (_processedMessageIds.contains(messageKey)) {
+              print('Duplicate message detected, ignoring: $messageKey');
+              return;
+            }
+            
+            // Đánh dấu tin nhắn đã được xử lý
+            _processedMessageIds.add(messageKey);
+            
+            // Giới hạn kích thước của Set để tránh tràn bộ nhớ
+            if (_processedMessageIds.length > 1000) {
+              _processedMessageIds.remove(_processedMessageIds.first);
+            }
+            
+            // Thêm tin nhắn vào stream
+            _messageController.add(message);
+          } catch (e) {
+            print('Error creating Message object: $e');
+            print('Message data: $messageData');
+          }
         } catch (e) {
           print('Error handling SignalR message: $e');
+          print('Error details: ${e.toString()}');
         }
       }
     });
 
-    hubConnection.onclose(({Exception? error}) => 
-      print('SignalR connection closed: $error')
-    );
+    hubConnection.onreconnecting(({Exception? error}) {
+      print('SignalR reconnecting: $error');
+      _connectionStatusController.add(false);
+    });
+
+    hubConnection.onreconnected(({String? connectionId}) {
+      print('SignalR reconnected with ID: $connectionId');
+      _connectionStatusController.add(true);
+      
+      // Khi kết nối lại, tham gia lại phòng
+      if (currentUserId != null) {
+        hubConnection.invoke('JoinRoom', args: [currentUserId!])
+          .then((_) => print('Rejoined room after reconnection'))
+          .catchError((e) => print('Error rejoining room: $e'));
+      }
+    });
+
+    hubConnection.onclose(({Exception? error}) {
+      print('SignalR connection closed: $error');
+      _connectionStatusController.add(false);
+    });
+
+    hubConnection.on('ReceiveTypingStatus', (arguments) {
+      if (arguments != null && arguments.length >= 2) {
+        try {
+          final senderId = arguments[0] as String;
+          final isTyping = arguments[1] as bool;
+          
+          _typingStatusController.add({senderId: isTyping});
+        } catch (e) {
+          print('Error handling typing status: $e');
+        }
+      }
+    });
   }
 
   Future<void> connect() async {
@@ -122,13 +197,36 @@ class ChatApiService {
 
     try {
       print('Connecting to SignalR...');
-      await hubConnection.start();
-      print('SignalR connected with state: ${hubConnection.state}');
       
-      if (currentUserId != null) {
-        print('Joining room for user: $currentUserId');
-        await hubConnection.invoke('JoinRoom', args: [currentUserId!]);
-        print('Joined room successfully');
+      // Thêm cơ chế retry với backoff
+      int retryCount = 0;
+      const maxRetries = 5;
+      
+      while (retryCount < maxRetries) {
+        try {
+          await hubConnection.start();
+          print('SignalR connected with state: ${hubConnection.state}');
+          
+          if (currentUserId != null) {
+            print('Joining room for user: $currentUserId');
+            await hubConnection.invoke('JoinRoom', args: [currentUserId!]);
+            print('Joined room successfully');
+          }
+          
+          // Kết nối thành công, thoát khỏi vòng lặp
+          break;
+        } catch (e) {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            print('Failed to connect to SignalR after $maxRetries attempts');
+            rethrow;
+          }
+          
+          // Tăng thời gian chờ theo cấp số nhân
+          final delay = Duration(milliseconds: 1000 * (1 << retryCount));
+          print('Retrying connection in ${delay.inSeconds} seconds (attempt $retryCount/$maxRetries)');
+          await Future.delayed(delay);
+        }
       }
     } catch (e) {
       print('Error connecting to SignalR: $e');
@@ -203,7 +301,6 @@ class ChatApiService {
 
   Future<bool> ensureConnected() async {
     if (hubConnection.state != HubConnectionState.Connected) {
-      print('SignalR not connected, reconnecting...');
       try {
         // Đóng kết nối hiện tại nếu đang trong trạng thái lỗi
         if (hubConnection.state == HubConnectionState.Disconnected ||
@@ -211,9 +308,8 @@ class ChatApiService {
             hubConnection.state == HubConnectionState.Reconnecting) {
           try {
             await hubConnection.stop();
-            print('Stopped existing connection');
           } catch (e) {
-            print('Error stopping connection: $e');
+            // Bỏ qua lỗi khi dừng kết nối
           }
         }
         
@@ -221,13 +317,7 @@ class ChatApiService {
         await connect();
         
         // Kiểm tra lại trạng thái kết nối
-        if (hubConnection.state == HubConnectionState.Connected) {
-          print('Successfully reconnected to SignalR');
-          return true;
-        } else {
-          print('Failed to reconnect to SignalR, state: ${hubConnection.state}');
-          return false;
-        }
+        return hubConnection.state == HubConnectionState.Connected;
       } catch (e) {
         print('Error reconnecting to SignalR: $e');
         return false;
@@ -242,34 +332,120 @@ class ChatApiService {
         throw Exception('CurrentUserId is not set');
       }
 
-      final messageData = {
-        "senderId": currentUserId,
-        "receiverId": receiverId,
-        "content": content,
-        "isRead": false,
-      };
-
-      // Đảm bảo kết nối trước khi gửi tin nhắn
-      if (hubConnection.state != HubConnectionState.Connected) {
-        await connect();
+      // Đảm bảo receiverId không rỗng
+      if (receiverId.isEmpty) {
+        throw Exception('ReceiverId is empty');
       }
 
-      // Gửi tin nhắn qua SignalR
-      await hubConnection.invoke('SendMessage', args: [messageData]);
-
-      // Gửi tin nhắn qua API REST
-      final response = await http.post(
-        Uri.parse("$baseUrl$chatSendEndpoint"),
-        headers: _headers,
-        body: jsonEncode(messageData),
+      // Tạo ID tin nhắn duy nhất để theo dõi
+      final localMessageId = DateTime.now().millisecondsSinceEpoch;
+      
+      // Lấy thời gian hiện tại và chuyển đổi sang UTC
+      final now = DateTime.now();
+      final utcNow = now.toUtc();
+      
+      print('Local time: $now, UTC time: $utcNow');
+      
+      // Tạo tin nhắn local để hiển thị ngay lập tức
+      final localMessage = Message(
+        id: localMessageId,
+        senderId: currentUserId!,
+        receiverId: receiverId,
+        content: content,
+        sentAt: now, // Sử dụng thời gian địa phương
+        isRead: false,
       );
+      
+      // Thêm tin nhắn vào stream để hiển thị ngay lập tức
+      _messageController.add(localMessage);
+      
+      // Cấu trúc dữ liệu cho REST API - chỉ gửi những trường cần thiết
+      final restApiMessageData = {
+        "Content": content,
+        "ReceiverId": receiverId,
+        "IsRead": false,
+        // Không gửi thời gian, để server tạo thời gian
+      };
 
-      if (response.statusCode != 200) {
-        throw Exception('Failed to send message');
+      print('Sending message to $receiverId: $content');
+
+      // Gửi tin nhắn qua API REST (phương thức chính)
+      try {
+        final response = await http.post(
+          Uri.parse("$baseUrl$chatSendEndpoint"),
+          headers: _headers,
+          body: jsonEncode(restApiMessageData),
+        );
+
+        if (response.statusCode == 200) {
+          print('Message sent via REST API');
+          
+          // Cập nhật ID tin nhắn từ server nếu có
+          try {
+            final responseData = jsonDecode(response.body);
+            if (responseData.containsKey('id')) {
+              final serverMessageId = responseData['id'];
+              // Cập nhật ID tin nhắn local với ID từ server
+              _messageController.add(localMessage.copyWith(id: serverMessageId));
+            }
+          } catch (e) {
+            print('Error parsing response: $e');
+          }
+        } else {
+          print('REST API error: ${response.statusCode} - ${response.body}');
+          
+          // Nếu REST API thất bại, thử gửi qua SignalR
+          if (hubConnection.state == HubConnectionState.Connected) {
+            final signalRMessageData = {
+              "senderId": currentUserId,
+              "receiverId": receiverId,
+              "content": content,
+              "isRead": false,
+              "id": localMessageId,
+              "sentAt": utcNow.toIso8601String(), // Gửi thời gian UTC
+            };
+            
+            try {
+              await hubConnection.invoke('SendMessage', args: [signalRMessageData]);
+              print('Message sent via SignalR as fallback');
+            } catch (e) {
+              print('Error sending message via SignalR: $e');
+              // Không throw exception ở đây, vì tin nhắn đã được hiển thị
+              // Thay vào đó, đánh dấu tin nhắn là "đang chờ"
+              _messageController.add(localMessage.copyWith(
+                content: "$content (Đang gửi...)",
+              ));
+            }
+          } else {
+            // Đánh dấu tin nhắn là "đang chờ"
+            _messageController.add(localMessage.copyWith(
+              content: "$content (Đang chờ kết nối...)",
+            ));
+          }
+        }
+      } catch (e) {
+        print('Error sending message: $e');
+        // Đánh dấu tin nhắn là "thất bại"
+        _messageController.add(localMessage.copyWith(
+          content: "$content (Gửi thất bại)",
+        ));
       }
     } catch (e) {
       print('Error sending message: $e');
       throw e;
+    }
+  }
+
+  // Thêm phương thức để gửi trạng thái đang nhập
+  Future<void> sendTypingStatus(String receiverId, bool isTyping) async {
+    if (currentUserId == null || hubConnection.state != HubConnectionState.Connected) {
+      return;
+    }
+    
+    try {
+      await hubConnection.invoke('SendTypingStatus', args: [currentUserId!, receiverId, isTyping]);
+    } catch (e) {
+      print('Error sending typing status: $e');
     }
   }
 
