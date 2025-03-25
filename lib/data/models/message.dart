@@ -1,3 +1,9 @@
+enum MessageType {
+  text,
+  image,
+  // Có thể thêm các loại khác trong tương lai: file, audio, video, etc.
+}
+
 class Message {
   final int id;
   final String senderId;
@@ -5,6 +11,8 @@ class Message {
   final String content;
   final DateTime sentAt;
   final bool isRead;
+  final MessageType type;
+  final String? imageUrl; // URL của hình ảnh nếu là tin nhắn hình ảnh
 
   Message({
     required this.id,
@@ -13,15 +21,19 @@ class Message {
     required this.content,
     required this.sentAt,
     required this.isRead,
+    this.type = MessageType.text,
+    this.imageUrl,
   });
 
   Message copyWith({
     int? id,
     String? senderId,
-    String? receiverId, 
+    String? receiverId,
     String? content,
     DateTime? sentAt,
     bool? isRead,
+    MessageType? type,
+    String? imageUrl,
   }) {
     return Message(
       id: id ?? this.id,
@@ -30,6 +42,8 @@ class Message {
       content: content ?? this.content,
       sentAt: sentAt ?? this.sentAt,
       isRead: isRead ?? this.isRead,
+      type: type ?? this.type,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -89,6 +103,24 @@ class Message {
     String receiverId = json['receiverId'] ?? json['ReceiverId'] ?? '';
     String content = json['content'] ?? json['Content'] ?? '';
     bool isRead = json['isRead'] ?? json['IsRead'] ?? false;
+    
+    // Xử lý loại tin nhắn và URL hình ảnh
+    MessageType type = MessageType.text;
+    String? imageUrl;
+    
+    if (json.containsKey('type') || json.containsKey('Type')) {
+      String typeStr = (json['type'] ?? json['Type'] ?? 'text').toString().toLowerCase();
+      if (typeStr == 'image') {
+        type = MessageType.image;
+        imageUrl = json['imageUrl'] ?? json['ImageUrl'];
+      }
+    } else if (json.containsKey('imageUrl') && json['imageUrl'] != null) {
+      type = MessageType.image;
+      imageUrl = json['imageUrl'];
+    } else if (json.containsKey('ImageUrl') && json['ImageUrl'] != null) {
+      type = MessageType.image;
+      imageUrl = json['ImageUrl'];
+    }
 
     return Message(
       id: messageId,
@@ -97,6 +129,8 @@ class Message {
       content: content,
       sentAt: messageSentAt,
       isRead: isRead,
+      type: type,
+      imageUrl: imageUrl,
     );
   }
 
@@ -108,27 +142,44 @@ class Message {
       'content': content,
       'sentAt': sentAt.toIso8601String(),
       'isRead': isRead,
+      'type': type.toString().split('.').last,
+      if (imageUrl != null) 'imageUrl': imageUrl,
     };
   }
 
   @override
   bool operator ==(Object other) =>
-    identical(this, other) ||
-    other is Message &&
-    runtimeType == other.runtimeType &&
-    id == other.id &&
-    senderId == other.senderId &&
-    receiverId == other.receiverId &&
-    content == other.content &&
-    sentAt == other.sentAt &&
-    isRead == other.isRead;
+      identical(this, other) ||
+      other is Message &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          senderId == other.senderId &&
+          receiverId == other.receiverId &&
+          content == other.content &&
+          sentAt == other.sentAt &&
+          isRead == other.isRead &&
+          type == other.type &&
+          imageUrl == other.imageUrl;
 
   @override
   int get hashCode =>
-    id.hashCode ^
-    senderId.hashCode ^
-    receiverId.hashCode ^
-    content.hashCode ^
-    sentAt.hashCode ^
-    isRead.hashCode;
+      id.hashCode ^
+      senderId.hashCode ^
+      receiverId.hashCode ^
+      content.hashCode ^
+      sentAt.hashCode ^
+      isRead.hashCode ^
+      type.hashCode ^
+      (imageUrl?.hashCode ?? 0);
+
+  // Thêm phương thức để kiểm tra xem imageUrl có phải là URL hợp lệ không
+  bool get isValidImageUrl => 
+      imageUrl != null && 
+      (imageUrl!.startsWith('http://') || imageUrl!.startsWith('https://'));
+
+  // Thêm phương thức để kiểm tra xem tin nhắn có đang trong trạng thái gửi không
+  bool get isSending => content == '[Đang gửi hình ảnh...]';
+
+  // Thêm phương thức để kiểm tra xem tin nhắn có bị lỗi không
+  bool get isError => content.startsWith('[Lỗi:');
 } 

@@ -11,7 +11,7 @@ class CustomInputField extends StatelessWidget {
     required this.label,
     required this.onChanged,
     required this.errorText,
-    this.obscureText = false,
+    this.obscureText = false, required FocusNode focusNode,
   }) : super(key: key);
 
   @override

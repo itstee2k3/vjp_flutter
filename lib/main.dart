@@ -93,6 +93,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
           home: const MainScreen(),
+          showPerformanceOverlay: false,
         ),
       ),
     );

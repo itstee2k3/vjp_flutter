@@ -5,86 +5,105 @@ import '../cubits/sign_in/sign_in_cubit.dart';
 import '../cubits/sign_in/sign_in_state.dart';
 import '../cubits/auth_cubit.dart';
 
-class SignInForm extends StatelessWidget {
+class SignInForm extends StatefulWidget {
   const SignInForm({Key? key}) : super(key: key);
 
-  @override 
+  @override
+  State<SignInForm> createState() => _SignInFormState();
+}
+
+class _SignInFormState extends State<SignInForm> {
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final signInCubit = context.watch<SignInCubit>();
 
-    return BlocConsumer<SignInCubit, SignInState>(
-      listener: (context, state) {
-        // if (state.errorMessage.isNotEmpty) {
-        //   ScaffoldMessenger.of(context).showSnackBar(
-        //     SnackBar(
-        //       content: Text(state.errorMessage),
-        //       backgroundColor: Colors.red,
-        //     ),
-        //   );
-        // }
-      },
-      builder: (context, state) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.all(32),
-          decoration: _buildContainerDecoration(),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Đăng Nhập",
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
-              CustomInputField(
-                label: "Email",
-                onChanged: signInCubit.onEmailChanged,
-                errorText: state.emailError,
-              ),
-              const SizedBox(height: 16),
-              CustomInputField(
-                label: "Mật khẩu",
-                onChanged: signInCubit.onPasswordChanged,
-                errorText: state.passwordError,
-                obscureText: true,
-              ),
-
-              if (state.errorMessage.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  state.errorMessage,
-                  style: const TextStyle(color: Colors.red)
+    return RepaintBoundary(
+      child: BlocConsumer<SignInCubit, SignInState>(
+        listener: (context, state) {
+          // if (state.errorMessage.isNotEmpty) {
+          //   ScaffoldMessenger.of(context).showSnackBar(
+          //     SnackBar(
+          //       content: Text(state.errorMessage),
+          //       backgroundColor: Colors.red,
+          //     ),
+          //   );
+          // }
+        },
+        builder: (context, state) {
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.all(32),
+            decoration: _buildContainerDecoration(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Đăng Nhập",
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              state.isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                onPressed: signInCubit.signIn,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepOrange,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                const SizedBox(height: 24),
+                CustomInputField(
+                  label: "Email",
+                  onChanged: signInCubit.onEmailChanged,
+                  errorText: state.emailError,
+                  focusNode: _emailFocusNode,
                 ),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20.0),
+                const SizedBox(height: 16),
+                CustomInputField(
+                  label: "Mật khẩu",
+                  onChanged: signInCubit.onPasswordChanged,
+                  errorText: state.passwordError,
+                  obscureText: true,
+                  focusNode: _passwordFocusNode,
+                ),
+
+                if (state.errorMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    "GO!",
-                    style: TextStyle(fontSize: 16, color: Colors.white),
+                    state.errorMessage,
+                    style: const TextStyle(color: Colors.red)
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+
+                const SizedBox(height: 24),
+
+                state.isLoading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                  onPressed: signInCubit.signIn,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Text(
+                      "GO!",
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

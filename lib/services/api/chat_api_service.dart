@@ -1,20 +1,32 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
+import 'package:flutter_socket_io/core/config/api_config.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:signalr_netcore/signalr_client.dart';
 import '../../data/models/message.dart';
 import '../../data/models/user.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path/path.dart' as path;
+import 'package:mime/mime.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http_parser/http_parser.dart';
 
 class ChatApiService {
+  late final Dio dio;
+
   String? _token;
   String? get token => _token;
 
   String? _currentUserId;
   String? get currentUserId => _currentUserId;
 
-  final String baseUrl = 'http://localhost:5294';
+  final String baseUrl = ApiConfig.baseUrl;
   late final HubConnection hubConnection;
 
   static const String userEndpoint = "/api/user";
@@ -36,6 +48,7 @@ class ChatApiService {
   Stream<Map<String, bool>> get typingStatus => _typingStatusController.stream;
 
   ChatApiService({
+
     String? token,
     String? currentUserId,
   }) : _token = token,
@@ -173,6 +186,33 @@ class ChatApiService {
         }
       }
     });
+
+    hubConnection.on("ReceiveMessage", _handleSignalRMessage);
+  }
+
+  void _handleSignalRMessage(List<Object?>? parameters) {
+    if (parameters == null || parameters.isEmpty) return;
+    
+    try {
+      final messageData = parameters[0];
+      print('Received SignalR message: $messageData');
+      
+      if (messageData is Map) {
+        // Xử lý Map trực tiếp
+        final message = Message.fromJson(Map<String, dynamic>.from(messageData));
+        _messageController.add(message);
+      } else {
+        // Chuyển đổi từ JSON string
+        final messageMap = jsonDecode(messageData.toString());
+        final message = Message.fromJson(messageMap);
+        _messageController.add(message);
+      }
+      
+      // Thông báo cho UI cập nhật
+      _connectionStatusController.add(true);
+    } catch (e) {
+      print('Error handling SignalR message: $e');
+    }
   }
 
   Future<void> connect() async {
@@ -326,110 +366,108 @@ class ChatApiService {
     return true;
   }
 
-  Future<void> sendMessage(String receiverId, String content) async {
+  Future<Message> sendMessage(String receiverId, String content) async {
     try {
-      if (currentUserId == null) {
-        throw Exception('CurrentUserId is not set');
-      }
-
-      // Đảm bảo receiverId không rỗng
+      // Kiểm tra xem receiverId có hợp lệ không
       if (receiverId.isEmpty) {
         throw Exception('ReceiverId is empty');
       }
-
-      // Tạo ID tin nhắn duy nhất để theo dõi
-      final localMessageId = DateTime.now().millisecondsSinceEpoch;
       
-      // Lấy thời gian hiện tại và chuyển đổi sang UTC
-      final now = DateTime.now();
-      final utcNow = now.toUtc();
+      // In ra để debug
+      print('Sending message to: $receiverId, content: $content');
       
-      print('Local time: $now, UTC time: $utcNow');
+      // Tạo body request với định dạng chính xác
+      final requestBody = jsonEncode({
+        'receiverId': receiverId,  // Đảm bảo tên trường đúng
+        'content': content,
+        'isRead': false
+      });
       
-      // Tạo tin nhắn local để hiển thị ngay lập tức
-      final localMessage = Message(
-        id: localMessageId,
+      // In ra body request để debug
+      print('Request body: $requestBody');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl$chatSendEndpoint'),
+        headers: _headers,
+        body: requestBody,
+      );
+      
+      // Kiểm tra response
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        print('Message sent via REST API');
+        
+        // Cập nhật ID tin nhắn từ server nếu có
+        try {
+          final responseData = jsonDecode(response.body);
+          if (responseData.containsKey('id')) {
+            final serverMessageId = responseData['id'];
+            // Cập nhật ID tin nhắn local với ID từ server
+            _messageController.add(Message(
+              id: serverMessageId,
+              senderId: currentUserId!,
+              receiverId: receiverId,
+              content: content,
+              sentAt: DateTime.now(),
+              isRead: false,
+            ));
+          }
+        } catch (e) {
+          print('Error parsing response: $e');
+        }
+      } else {
+        print('REST API error: ${response.statusCode} - ${response.body}');
+        
+        // Nếu REST API thất bại, thử gửi qua SignalR
+        if (hubConnection.state == HubConnectionState.Connected) {
+          final signalRMessageData = {
+            "senderId": currentUserId,
+            "receiverId": receiverId,
+            "content": content,
+            "isRead": false,
+            "id": DateTime.now().millisecondsSinceEpoch,
+            "sentAt": DateTime.now().toUtc().toIso8601String(), // Gửi thời gian UTC
+          };
+          
+          try {
+            await hubConnection.invoke('SendMessage', args: [signalRMessageData]);
+            print('Message sent via SignalR as fallback');
+          } catch (e) {
+            print('Error sending message via SignalR: $e');
+            // Không throw exception ở đây, vì tin nhắn đã được hiển thị
+            // Thay vào đó, đánh dấu tin nhắn là "đang chờ"
+            _messageController.add(Message(
+              id: DateTime.now().millisecondsSinceEpoch,
+              senderId: currentUserId!,
+              receiverId: receiverId,
+              content: "$content (Đang gửi...)",
+              sentAt: DateTime.now(),
+              isRead: false,
+            ));
+          }
+        } else {
+          // Đánh dấu tin nhắn là "đang chờ"
+          _messageController.add(Message(
+            id: DateTime.now().millisecondsSinceEpoch,
+            senderId: currentUserId!,
+            receiverId: receiverId,
+            content: "$content (Đang chờ kết nối...)",
+            sentAt: DateTime.now(),
+            isRead: false,
+          ));
+        }
+      }
+      
+      return Message(
+        id: DateTime.now().millisecondsSinceEpoch,
         senderId: currentUserId!,
         receiverId: receiverId,
         content: content,
-        sentAt: now, // Sử dụng thời gian địa phương
+        sentAt: DateTime.now(),
         isRead: false,
       );
-      
-      // Thêm tin nhắn vào stream để hiển thị ngay lập tức
-      _messageController.add(localMessage);
-      
-      // Cấu trúc dữ liệu cho REST API - chỉ gửi những trường cần thiết
-      final restApiMessageData = {
-        "Content": content,
-        "ReceiverId": receiverId,
-        "IsRead": false,
-        // Không gửi thời gian, để server tạo thời gian
-      };
-
-      print('Sending message to $receiverId: $content');
-
-      // Gửi tin nhắn qua API REST (phương thức chính)
-      try {
-        final response = await http.post(
-          Uri.parse("$baseUrl$chatSendEndpoint"),
-          headers: _headers,
-          body: jsonEncode(restApiMessageData),
-        );
-
-        if (response.statusCode == 200) {
-          print('Message sent via REST API');
-          
-          // Cập nhật ID tin nhắn từ server nếu có
-          try {
-            final responseData = jsonDecode(response.body);
-            if (responseData.containsKey('id')) {
-              final serverMessageId = responseData['id'];
-              // Cập nhật ID tin nhắn local với ID từ server
-              _messageController.add(localMessage.copyWith(id: serverMessageId));
-            }
-          } catch (e) {
-            print('Error parsing response: $e');
-          }
-        } else {
-          print('REST API error: ${response.statusCode} - ${response.body}');
-          
-          // Nếu REST API thất bại, thử gửi qua SignalR
-          if (hubConnection.state == HubConnectionState.Connected) {
-            final signalRMessageData = {
-              "senderId": currentUserId,
-              "receiverId": receiverId,
-              "content": content,
-              "isRead": false,
-              "id": localMessageId,
-              "sentAt": utcNow.toIso8601String(), // Gửi thời gian UTC
-            };
-            
-            try {
-              await hubConnection.invoke('SendMessage', args: [signalRMessageData]);
-              print('Message sent via SignalR as fallback');
-            } catch (e) {
-              print('Error sending message via SignalR: $e');
-              // Không throw exception ở đây, vì tin nhắn đã được hiển thị
-              // Thay vào đó, đánh dấu tin nhắn là "đang chờ"
-              _messageController.add(localMessage.copyWith(
-                content: "$content (Đang gửi...)",
-              ));
-            }
-          } else {
-            // Đánh dấu tin nhắn là "đang chờ"
-            _messageController.add(localMessage.copyWith(
-              content: "$content (Đang chờ kết nối...)",
-            ));
-          }
-        }
-      } catch (e) {
-        print('Error sending message: $e');
-        // Đánh dấu tin nhắn là "thất bại"
-        _messageController.add(localMessage.copyWith(
-          content: "$content (Gửi thất bại)",
-        ));
-      }
     } catch (e) {
       print('Error sending message: $e');
       throw e;
@@ -454,10 +492,15 @@ class ChatApiService {
     disconnect();
   }
 
-  Map<String, String> get _headers => {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer $token",
-  };
+  Map<String, String> get _headers {
+    // In ra headers để debug
+    final headers = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $token",
+    };
+    print('Request headers: $headers');
+    return headers;
+  }
 
   void updateToken(String newToken) {
     _token = newToken;
@@ -479,5 +522,174 @@ class ChatApiService {
     if (hubConnection.state == HubConnectionState.Connected) {
       hubConnection.stop().then((_) => connect());
     }
+  }
+
+  // Thêm phương thức để gửi hình ảnh
+  Future<Message> sendImageMessage(String receiverId, File imageFile) async {
+    try {
+      if (currentUserId == null) {
+        throw Exception('CurrentUserId is not set');
+      }
+
+      // Đảm bảo receiverId không rỗng
+      if (receiverId.isEmpty) {
+        throw Exception('ReceiverId is empty');
+      }
+      
+      // Kiểm tra file có tồn tại không
+      if (!imageFile.existsSync()) {
+        throw Exception('Image file does not exist: ${imageFile.path}');
+      }
+      
+      // Kiểm tra kích thước file
+      final fileSize = await imageFile.length();
+      final maxSize = 10 * 1024 * 1024; // 10MB
+
+      if (fileSize > maxSize) {
+        throw Exception('Hình ảnh quá lớn (tối đa 10MB)');
+      }
+      
+      // Nén hình ảnh nếu lớn hơn 1MB
+      if (fileSize > 1024 * 1024) {
+        final compressedFile = await _compressImage(imageFile);
+        imageFile = compressedFile;
+      }
+      
+      print('Sending image: ${imageFile.path}, size: ${await imageFile.length()} bytes');
+
+      // Tạo ID tin nhắn duy nhất để theo dõi
+      final localMessageId = DateTime.now().millisecondsSinceEpoch;
+      final now = DateTime.now();
+      
+      // Tạo form data để upload file
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/upload/image'),
+      );
+      
+      // Thêm headers
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+      });
+      
+      // Thêm file vào request
+      final mimeType = lookupMimeType(imageFile.path) ?? 'image/jpeg';
+      request.files.add(await http.MultipartFile.fromPath(
+        'File',
+        imageFile.path,
+        contentType: MediaType.parse(mimeType),
+      ));
+      
+      // Thêm các trường khác
+      request.fields['ReceiverId'] = receiverId;
+      request.fields['Caption'] = '[Hình ảnh]';
+      
+      // Hiển thị tin nhắn tạm thời trong UI
+      final tempMessage = Message(
+        id: localMessageId,
+        senderId: currentUserId!,
+        receiverId: receiverId,
+        content: '[Đang gửi hình ảnh...]',
+        sentAt: now,
+        isRead: false,
+        type: MessageType.image,
+        imageUrl: null, // Chưa có URL
+      );
+      
+      // Thêm tin nhắn tạm thời vào stream
+      _messageController.add(tempMessage);
+      
+      // Gửi request
+      print('Sending image upload request to: $baseUrl/api/upload/image');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      print('Upload response status: ${response.statusCode}');
+      print('Upload response body: ${response.body}');
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        
+        // Tạo tin nhắn mới với URL hình ảnh từ server
+        final updatedMessage = Message(
+          id: responseData['id'] ?? localMessageId,
+          senderId: currentUserId!,
+          receiverId: receiverId,
+          content: '[Hình ảnh]',
+          sentAt: now,
+          isRead: false,
+          type: MessageType.image,
+          imageUrl: responseData['imageUrl'],
+        );
+        
+        // Cập nhật tin nhắn trong stream
+        _messageController.add(updatedMessage);
+        
+        print('Image message added to stream: ${updatedMessage.id}, URL: ${updatedMessage.imageUrl}');
+        
+        return updatedMessage;
+      } else {
+        print('Failed to send image: ${response.statusCode} - ${response.body}');
+        
+        // Phân tích lỗi từ server
+        String errorText = 'Lỗi gửi hình ảnh';
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData is Map && errorData.containsKey('message')) {
+            errorText = errorData['message'];
+          } else if (response.body.contains('Internal server error')) {
+            errorText = 'Lỗi máy chủ: ${response.body}';
+          }
+        } catch (e) {
+          // Nếu không phân tích được JSON, sử dụng thông báo mặc định
+        }
+        
+        // Giới hạn độ dài của thông báo lỗi
+        if (errorText.length > 30) {
+          errorText = '${errorText.substring(0, 30)}...';
+        }
+        
+        // Cập nhật tin nhắn tạm thời thành tin nhắn lỗi
+        final errorMessage = Message(
+          id: localMessageId,
+          senderId: currentUserId!,
+          receiverId: receiverId,
+          content: '[Lỗi: $errorText]',
+          sentAt: now,
+          isRead: false,
+          type: MessageType.text,
+          imageUrl: null,
+        );
+        
+        // Thêm tin nhắn lỗi vào stream
+        _messageController.add(errorMessage);
+        
+        throw Exception('Failed to send image: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      print('Error sending image: $e');
+      throw e;
+    }
+  }
+
+  Future<File> _compressImage(File file) async {
+    final tempDir = await getTemporaryDirectory();
+    final pathToSave = tempDir.path;
+    final fileName = path.basename(file.path);
+    final targetPath = '$pathToSave/$fileName';
+    
+    final result = await FlutterImageCompress.compressAndGetFile(
+      file.absolute.path,
+      targetPath,
+      quality: 30,
+      minWidth: 400,
+      minHeight: 400,
+    );
+    
+    if (result == null) {
+      throw Exception('Không thể nén hình ảnh');
+    }
+    
+    return File(result.path);
   }
 }
