@@ -697,4 +697,46 @@ class ChatApiService {
     
     return File(result.path);
   }
+
+  // Lấy tin nhắn mới nhất giữa người dùng hiện tại và từng người dùng khác
+  Future<Map<String, Message?>> getLatestMessagesForAllUsers(List<User> users) async {
+    print('Getting latest messages for users: ${users.length}');
+    
+    Map<String, Message?> results = {};
+    
+    try {
+      for (var user in users) {
+        try {
+          final chatHistory = await getChatHistory(user.id, page: 1, pageSize: 1); // Chỉ lấy 1 tin nhắn mới nhất
+          if (chatHistory.isNotEmpty) {
+            results[user.id] = chatHistory.first;
+          } else {
+            results[user.id] = null;
+          }
+        } catch (e) {
+          print('Error getting latest message for user ${user.id}: $e');
+          results[user.id] = null;
+        }
+      }
+      
+      return results;
+    } catch (e) {
+      print('Error in getLatestMessagesForAllUsers: $e');
+      return {};
+    }
+  }
+
+  // Lấy tin nhắn mới nhất từ một người dùng cụ thể
+  Future<Message?> getLatestMessage(String userId) async {
+    try {
+      final chatHistory = await getChatHistory(userId, page: 1, pageSize: 1); // Chỉ lấy 1 tin nhắn mới nhất
+      if (chatHistory.isNotEmpty) {
+        return chatHistory.first;
+      }
+      return null;
+    } catch (e) {
+      print('Error getting latest message: $e');
+      return null;
+    }
+  }
 }

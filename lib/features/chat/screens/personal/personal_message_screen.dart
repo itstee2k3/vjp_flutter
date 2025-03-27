@@ -53,7 +53,7 @@ class _ChatDetailScreenState extends State<PersonalMessageScreen> with WidgetsBi
         
         if (hasNewImageMessage) {
           print('New image message detected, forcing refresh');
-          // Force refresh UI
+          // Không xóa toàn bộ cache, chỉ cần setState() để cập nhật các tin nhắn mới
           setState(() {});
         }
         
@@ -398,6 +398,7 @@ class _ChatDetailScreenState extends State<PersonalMessageScreen> with WidgetsBi
                   width: 200,
                   height: 200,
                   fit: BoxFit.cover,
+                  cacheKey: 'image_${message.id}_${message.imageUrl}',
                   placeholder: (context, url) => Container(
                     width: 200,
                     height: 200,
@@ -424,7 +425,10 @@ class _ChatDetailScreenState extends State<PersonalMessageScreen> with WidgetsBi
                       ),
                     ),
                   ),
-                  key: ValueKey('image_${message.id}_${ApiConfig.getFullImageUrl(message.imageUrl).hashCode}'),
+                  key: ValueKey('image_${message.id}_${message.imageUrl}'),
+                  memCacheWidth: 400,
+                  maxWidthDiskCache: 400,
+                  useOldImageOnUrlChange: false,
                 ),
               ),
               if (message.content.isNotEmpty && message.content != '[Hình ảnh]')

@@ -61,14 +61,25 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     // Tạo danh sách tin nhắn mới để trigger rebuild
     final updatedMessages = List<Message>.from(state.messages);
 
+    // Xử lý đặc biệt cho tin nhắn hình ảnh
+    if (message.type == MessageType.image) {
+      // Loại bỏ tin nhắn hình ảnh trùng lặp hoặc cũ từ cùng một người gửi
+      updatedMessages.removeWhere((m) => 
+        m.type == MessageType.image && 
+        m.senderId == message.senderId && 
+        m.receiverId == message.receiverId &&
+        m.id != message.id && 
+        m.sentAt.difference(message.sentAt).inSeconds.abs() < 60
+      );
+    }
+
     // Kiểm tra tin nhắn đã tồn tại chưa
     final existingIndex = updatedMessages.indexWhere((m) =>
       m.id == message.id ||
       (m.senderId == message.senderId &&
        m.receiverId == message.receiverId &&
-       ((m.type == MessageType.image && message.type == MessageType.image) ||
-        (m.content == message.content &&
-         m.sentAt.difference(message.sentAt).inSeconds.abs() < 5)))
+       (m.content == message.content &&
+        m.sentAt.difference(message.sentAt).inSeconds.abs() < 5))
     );
 
     if (existingIndex >= 0) {
@@ -187,6 +198,32 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
       print('Selected file: ${file.path}, size: ${await file.length()} bytes');
 
       try {
+        // Tạo ID duy nhất cho tin nhắn hình ảnh này
+        final uniqueId = DateTime.now().millisecondsSinceEpoch;
+        
+        // Tạo danh sách tin nhắn mới và loại bỏ tin nhắn hình ảnh đang gửi trước đó
+        final updatedMessages = List<Message>.from(state.messages);
+        updatedMessages.removeWhere((m) => 
+          m.type == MessageType.image && 
+          m.imageUrl == null && 
+          m.senderId == _chatService.currentUserId
+        );
+        
+        // Thêm tin nhắn tạm thời
+        final tempMessage = Message(
+          id: uniqueId,
+          senderId: _chatService.currentUserId!,
+          receiverId: receiverId,
+          content: '[Đang gửi...]',
+          sentAt: DateTime.now(),
+          isRead: false,
+          type: MessageType.image,
+          imageUrl: null,
+        );
+        
+        updatedMessages.add(tempMessage);
+        emit(state.copyWith(messages: updatedMessages));
+        
         await _chatService.sendImageMessage(receiverId, file);
         emit(state.copyWith(isSending: false));
       } catch (e) {

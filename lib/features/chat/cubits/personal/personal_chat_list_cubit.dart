@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../data/models/user.dart';
+import '../../../../data/models/message.dart';
 import '../../../../services/api/chat_api_service.dart';
 import '../../../auth/cubits/auth_cubit.dart';
 import 'package:signalr_netcore/signalr_client.dart';
@@ -64,8 +65,13 @@ class PersonalChatListCubit extends Cubit<PersonalChatListState> {
     emit(state.copyWith(isLoading: true));
     try {
       final users = await _apiService!.getUsers();
+      
+      // Tải tin nhắn mới nhất cho mỗi người dùng
+      final latestMessages = await _apiService!.getLatestMessagesForAllUsers(users);
+      
       emit(state.copyWith(
         users: users,
+        latestMessages: latestMessages,
         isLoading: false,
         isInitialized: true,
       ));
