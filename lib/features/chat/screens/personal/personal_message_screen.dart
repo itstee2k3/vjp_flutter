@@ -5,39 +5,40 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../data/models/message.dart';
-import '../cubits/chat_cubit.dart';
+import '../../../../data/models/message.dart';
+import '../../cubits/personal/personal_chat_cubit.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../core/config/api_config.dart';
+import '../../../../core/config/api_config.dart';
+import '../../cubits/personal/personal_chat_state.dart';
 
-class ChatDetailScreen extends StatefulWidget {
+class PersonalMessageScreen extends StatefulWidget {
   final String username;
   final String userId;
 
-  const ChatDetailScreen({
+  const PersonalMessageScreen({
     Key? key,
     required this.username,
     required this.userId,
   }) : super(key: key);
 
   @override
-  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
+  State<PersonalMessageScreen> createState() => _ChatDetailScreenState();
 }
 
-class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBindingObserver {
+class _ChatDetailScreenState extends State<PersonalMessageScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  StreamSubscription<ChatState>? _chatSubscription;
-  late final ChatCubit _chatCubit;
+  StreamSubscription<PersonalChatState>? _chatSubscription;
+  late final PersonalChatCubit _chatCubit;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
-    _chatCubit = context.read<ChatCubit>();
+    _chatCubit = context.read<PersonalChatCubit>();
     if (_chatCubit.chatService.hubConnection.state != HubConnectionState.Connected) {
       _chatCubit.chatService.connect();
     }
@@ -131,7 +132,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
           IconButton(
             icon: Icon(Icons.refresh),
             onPressed: () {
-              final chatCubit = context.read<ChatCubit>();
+              final chatCubit = context.read<PersonalChatCubit>();
               chatCubit.resetAndReloadMessages();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Đang tải lại tin nhắn...')),
@@ -141,13 +142,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
           IconButton(
             icon: Icon(Icons.sync),
             onPressed: () {
-              final chatCubit = context.read<ChatCubit>();
+              final chatCubit = context.read<PersonalChatCubit>();
               chatCubit.loadMessages();
             },
           ),
         ],
       ),
-      body: BlocListener<ChatCubit, ChatState>(
+      body: BlocListener<PersonalChatCubit, PersonalChatState>(
         listener: (context, state) {
           if (state.error != null) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -158,7 +159,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
         child: Column(
           children: [
             Expanded(
-              child: BlocBuilder<ChatCubit, ChatState>(
+              child: BlocBuilder<PersonalChatCubit, PersonalChatState>(
                 builder: (context, state) {
                   if (state.isLoading) {
                     return const Center(child: CircularProgressIndicator());
@@ -207,7 +208,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
                     icon: Icon(Icons.image),
                     onPressed: () async {
                       try {
-                        await context.read<ChatCubit>().sendImage();
+                        await context.read<PersonalChatCubit>().sendImage();
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Lỗi khi gửi ảnh: $e')),
@@ -239,7 +240,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
   }
 
   @override
-  void didUpdateWidget(covariant ChatDetailScreen oldWidget) {
+  void didUpdateWidget(covariant PersonalMessageScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -267,7 +268,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
 
   void _sendMessage() {
     if (_messageController.text.isNotEmpty) {
-      context.read<ChatCubit>().sendMessage(
+      context.read<PersonalChatCubit>().sendMessage(
         _messageController.text,
       );
       _messageController.clear();
@@ -337,7 +338,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> with WidgetsBinding
               SizedBox(height: 8),
               TextButton(
                 onPressed: () {
-                  context.read<ChatCubit>().retryImage();
+                  context.read<PersonalChatCubit>().retryImage();
                 },
                 child: Text('Thử lại'),
               ),

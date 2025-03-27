@@ -3,10 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_socket_io/services/api/chat_api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'features/auth/cubits/auth_cubit.dart';
-import 'features/auth/cubits/auth_state.dart';
-import 'features/chat/cubits/chat_list_cubit.dart';
+import 'features/chat/cubits/personal/personal_chat_list_cubit.dart';
+import 'features/chat/cubits/group/group_chat_list_cubit.dart';
 import 'services/api/api_service.dart';
-import 'core/config/app_routes.dart';
+import 'services/api/group_chat_api_service.dart';
 import 'features/home/cubits/home_cubit.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'features/main/cubits/main_cubit.dart';
@@ -51,12 +51,23 @@ class MyApp extends StatelessWidget {
           BlocProvider(
             create: (context) {
               final authCubit = context.read<AuthCubit>();
-              return ChatListCubit(
+              return PersonalChatListCubit(
                 ChatApiService(
                   token: authCubit.state.accessToken,
                   currentUserId: authCubit.state.userId,
                 ),
                 authCubit: authCubit,
+              );
+            },
+          ),
+          BlocProvider(
+            create: (context) {
+              final authCubit = context.read<AuthCubit>();
+              return GroupChatListCubit(
+                apiService: GroupChatApiService(
+                  token: authCubit.state.accessToken,
+                  currentUserId: authCubit.state.userId,
+                ),
               );
             },
           ),

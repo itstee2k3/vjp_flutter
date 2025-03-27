@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_socket_io/features/auth/cubits/auth_cubit.dart';
 import '../../features/auth/screens/auth_screen.dart';
+import '../../features/chat/cubits/personal/personal_chat_list_cubit.dart';
 import '../../features/home/screens/home_screen.dart';
-import '../../features/chat/cubits/chat_cubit.dart';
-import '../../features/chat/screens/chat_screen.dart';
-import '../../features/chat/cubits/chat_list_cubit.dart';
+import '../../features/chat/screens/home_chat_screen.dart';
 import '../../services/api/chat_api_service.dart';
-import 'dart:convert';
 
 class AppRoutes {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
@@ -38,17 +36,17 @@ class AppRoutes {
 
           return MultiBlocProvider(
             providers: [
-              BlocProvider<ChatListCubit>(
+              BlocProvider<PersonalChatListCubit>(
                 create: (context) {
                   final authCubit = context.read<AuthCubit>();
-                  return ChatListCubit(
+                  return PersonalChatListCubit(
                     chatApiService,
                     authCubit: authCubit,
                   )..loadUsers();
                 },
               ),
             ],
-            child: const ChatScreen(),
+            child: const HomeChatScreen(),
           );
         default:
           return const HomeScreen();

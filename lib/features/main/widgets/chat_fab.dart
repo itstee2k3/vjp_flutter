@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../features/auth/cubits/auth_cubit.dart';
-import '../../../features/chat/screens/chat_screen.dart';
+import '../../../features/chat/screens/home_chat_screen.dart';
 import '../../../services/api/chat_api_service.dart';
-import '../../chat/cubits/chat_list_cubit.dart';
+import '../../chat/cubits/personal/personal_chat_list_cubit.dart';
 
 class ChatFAB extends StatelessWidget {
   const ChatFAB({Key? key}) : super(key: key);
@@ -50,7 +50,7 @@ class ChatFAB extends StatelessWidget {
     }
 
     // Tạo ChatListCubit với token mới nhất
-    final chatListCubit = ChatListCubit(
+    final chatListCubit = PersonalChatListCubit(
       ChatApiService(
         token: authState.accessToken,
         currentUserId: authState.userId,
@@ -68,7 +68,7 @@ class ChatFAB extends StatelessWidget {
       MaterialPageRoute(
         builder: (context) => BlocProvider.value(
           value: chatListCubit,
-          child: const ChatScreen(),
+          child: const HomeChatScreen(),
         ),
       ),
     );

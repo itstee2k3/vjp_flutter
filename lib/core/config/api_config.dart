@@ -56,4 +56,10 @@ class ApiConfig {
     // Nếu imageUrl là đường dẫn tương đối (không bắt đầu bằng /)
     return '$baseUrl/$imageUrl';
   }
+  
+  // Avatar mặc định cho user nếu không có avatar
+  static String get defaultUserAvatar => 'assets/avatar_default/avatar_default.png';
+  
+  // Avatar mặc định cho group nếu không có avatar
+  static String get defaultGroupAvatar => 'assets/avatar_default/avatar_group_default.png';
 }

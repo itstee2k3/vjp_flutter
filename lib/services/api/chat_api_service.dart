@@ -48,13 +48,18 @@ class ChatApiService {
   Stream<Map<String, bool>> get typingStatus => _typingStatusController.stream;
 
   ChatApiService({
-
     String? token,
     String? currentUserId,
   }) : _token = token,
        _currentUserId = currentUserId {
     print('ChatApiService initialized with token: ${token?.substring(0, 20)}...');
     print('ChatApiService initialized with userId: $currentUserId');
+
+    // Khởi tạo Dio với baseUrl
+    dio = Dio(BaseOptions(
+      baseUrl: baseUrl,
+      headers: token != null ? {'Authorization': 'Bearer $token'} : null,
+    ));
 
     if (token != null && _currentUserId == null) {
       try {
