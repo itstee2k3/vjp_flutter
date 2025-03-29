@@ -3,6 +3,7 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://storage.googleapis.com/download.flutter.io' }
     }
 
     dependencies {
@@ -11,9 +12,9 @@ buildscript {
     }
 }
 
-plugins {
-    id 'dev.flutter.flutter-plugins-plugin' version '1.0.0' apply false
-}
+// plugins {
+//     id 'dev.flutter.flutter-plugins-plugin' version '1.0.0' apply false
+// }
 
 allprojects {
     repositories {

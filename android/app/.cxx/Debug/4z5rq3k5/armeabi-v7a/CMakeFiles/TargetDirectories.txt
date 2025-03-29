@@ -1,0 +1,2 @@
+/Users/thang/CODE/socket_io_flutter/android/app/.cxx/Debug/4z5rq3k5/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/thang/CODE/socket_io_flutter/android/app/.cxx/Debug/4z5rq3k5/armeabi-v7a/CMakeFiles/rebuild_cache.dir

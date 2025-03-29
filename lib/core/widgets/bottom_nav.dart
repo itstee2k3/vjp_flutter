@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:go_router/go_router.dart';
 
 class BottomNavigation extends StatelessWidget {
   final int currentIndex;
@@ -30,8 +31,8 @@ class BottomNavigation extends StatelessWidget {
       animationDuration: const Duration(milliseconds: 300),
       onTap: (index) {
         // Pop màn hình chi tiết nếu đang ở đó
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
+        if (context.canPop()) {
+          context.pop();
         }
         onTap(index);
       },
