@@ -25,15 +25,13 @@ class TopNavigation extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final bool canPop = Navigator.of(context).canPop();
 
-    return BlocBuilder<AuthCubit, auth.AuthState>(
-      builder: (context, state) {
-        // Kiểm tra token khi build TopNavBar
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (state.isAuthenticated) {
-            context.read<AuthCubit>().checkAuthStatus();
-          }
-        });
-
+    return BlocSelector<AuthCubit, auth.AuthState, _AuthUIState>(
+      selector: (state) => _AuthUIState(
+        isAuthenticated: state.isAuthenticated,
+        accessToken: state.accessToken,
+        fullName: state.fullName,
+      ),
+      builder: (context, authState) {
         return AppBar(
           leading: leading ?? (canPop ? BackButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -53,7 +51,7 @@ class TopNavigation extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 _buildLogo(),
                 const Spacer(),
-                _buildUserActions(context, state),
+                _buildUserActions(context, authState),
               ],
             ),
           ),
@@ -82,7 +80,7 @@ class TopNavigation extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildUserActions(BuildContext context, auth.AuthState state) {
+  Widget _buildUserActions(BuildContext context, _AuthUIState state) {
     return Row(
       children: [
         _buildLanguageSelector(),
@@ -199,5 +197,29 @@ class TopNavigation extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Size get preferredSize => const Size.fromHeight(60);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+}
+
+class _AuthUIState {
+  final bool isAuthenticated;
+  final String? accessToken;
+  final String? fullName;
+
+  _AuthUIState({
+    required this.isAuthenticated,
+    this.accessToken,
+    this.fullName,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _AuthUIState &&
+          runtimeType == other.runtimeType &&
+          isAuthenticated == other.isAuthenticated &&
+          accessToken == other.accessToken &&
+          fullName == other.fullName;
+
+  @override
+  int get hashCode => Object.hash(isAuthenticated, accessToken, fullName);
 }

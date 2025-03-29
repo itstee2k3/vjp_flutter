@@ -56,47 +56,130 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
 
   void _handleNewMessage(Message message) {
     // Đảm bảo tin nhắn được xử lý đúng cách
-    print('Handling new message: ${message.id}, type: ${message.type}');
+    print('Handling new message: ${message.id}, type: ${message.type}, imageUrl: ${message.imageUrl}');
 
+    // Kiểm tra nếu đây là tin nhắn hình ảnh mới (có imageUrl)
+    final isFreshImageMessage = message.type == MessageType.image && 
+                              message.imageUrl != null && 
+                              !message.content.contains('[Đang gửi');
+    
     // Tạo danh sách tin nhắn mới để trigger rebuild
     final updatedMessages = List<Message>.from(state.messages);
 
-    // Xử lý đặc biệt cho tin nhắn hình ảnh
+    // Kiểm tra tin nhắn đã tồn tại chưa - cập nhật cách kiểm tra cho tin nhắn hình ảnh
+    int existingIndex = -1;
+    
     if (message.type == MessageType.image) {
-      // Loại bỏ tin nhắn hình ảnh trùng lặp hoặc cũ từ cùng một người gửi
-      updatedMessages.removeWhere((m) => 
-        m.type == MessageType.image && 
-        m.senderId == message.senderId && 
-        m.receiverId == message.receiverId &&
-        m.id != message.id && 
-        m.sentAt.difference(message.sentAt).inSeconds.abs() < 60
+      // Với tin nhắn hình ảnh từ server (có URL), tìm tất cả tin nhắn ảnh tạm thời để cập nhật
+      if (isFreshImageMessage) {
+        // Tìm tin nhắn tạm thời "Đang gửi" để thay thế
+        existingIndex = updatedMessages.indexWhere((m) =>
+          m.type == MessageType.image && 
+          m.senderId == message.senderId &&
+          m.content.contains('[Đang gửi') && 
+          m.imageUrl == null // tin nhắn tạm thời chưa có URL
+        );
+        
+        // Nếu đã có một tin nhắn hoàn chỉnh giống hệt (có cùng URL), bỏ qua
+        final hasDuplicateComplete = updatedMessages.any((m) => 
+          m.type == MessageType.image && 
+          m.imageUrl == message.imageUrl &&
+          m.senderId == message.senderId &&
+          !m.content.contains('[Đang gửi')
+        );
+        
+        if (hasDuplicateComplete) {
+          print('Skipping duplicate complete image message with same URL');
+          if (existingIndex >= 0) {
+            // Nếu có tin nhắn tạm thời, xóa nó khỏi danh sách
+            updatedMessages.removeAt(existingIndex);
+            emit(state.copyWith(messages: updatedMessages));
+          }
+          return;
+        }
+      } else {
+        // Với tin nhắn ảnh tạm thời, kiểm tra đã có chưa
+        existingIndex = updatedMessages.indexWhere((m) =>
+          m.type == MessageType.image && 
+          m.senderId == message.senderId &&
+          m.content.contains('[Đang gửi') && 
+          m.imageUrl == null
+        );
+      }
+    } else {
+      // Với các tin nhắn khác, tìm theo ID hoặc nội dung + thời gian
+      existingIndex = updatedMessages.indexWhere((m) =>
+        m.id == message.id ||
+        (m.senderId == message.senderId &&
+         m.receiverId == message.receiverId &&
+         m.content == message.content &&
+         m.sentAt.difference(message.sentAt).inSeconds.abs() < 5)
       );
     }
 
-    // Kiểm tra tin nhắn đã tồn tại chưa
-    final existingIndex = updatedMessages.indexWhere((m) =>
-      m.id == message.id ||
-      (m.senderId == message.senderId &&
-       m.receiverId == message.receiverId &&
-       (m.content == message.content &&
-        m.sentAt.difference(message.sentAt).inSeconds.abs() < 5))
-    );
-
     if (existingIndex >= 0) {
-      // Cập nhật tin nhắn hiện có
+      // Cập nhật tin nhắn tạm thời thành tin nhắn thật với URL
       print('Updating existing message at index $existingIndex');
-      updatedMessages[existingIndex] = message;
+      final existingMessage = updatedMessages[existingIndex];
+      print('Old message: ${existingMessage.id}, content: ${existingMessage.content}, imageUrl: ${existingMessage.imageUrl}');
+      print('New message: ${message.id}, content: ${message.content}, imageUrl: ${message.imageUrl}');
+      
+      // Nếu tin nhắn cũ là tạm thời và tin nhắn mới có URL, cập nhật
+      if (existingMessage.content.contains('[Đang gửi') && message.imageUrl != null) {
+        updatedMessages[existingIndex] = message;
+      }
+      // Hoặc nếu trùng ID nhưng tin nhắn mới có dữ liệu đầy đủ hơn
+      else if (existingMessage.id == message.id && message.imageUrl != null && existingMessage.imageUrl == null) {
+        updatedMessages[existingIndex] = message;
+      }
     } else {
-      // Thêm tin nhắn mới
-      print('Adding new message');
-      updatedMessages.add(message);
+      // Luôn thêm tin nhắn hình ảnh mới có URL nếu không tìm thấy tin nhắn tương ứng để cập nhật
+      if (isFreshImageMessage) {
+        // Kiểm tra xem đã có tin nhắn hoàn chỉnh với cùng URL chưa
+        final hasDuplicateUrl = updatedMessages.any((m) => 
+          m.type == MessageType.image && 
+          m.imageUrl == message.imageUrl &&
+          m.senderId == message.senderId
+        );
+        
+        if (!hasDuplicateUrl) {
+          print('Adding new image message with URL: ${message.imageUrl}');
+          updatedMessages.add(message);
+        } else {
+          print('Skipping duplicate image message with URL: ${message.imageUrl}');
+        }
+      } 
+      // Thêm các tin nhắn khác (không phải ảnh)
+      else if (message.type != MessageType.image) {
+        print('Adding new non-image message: ${message.id}, type: ${message.type}');
+        updatedMessages.add(message);
+      }
+      // Đối với tin nhắn tạm thời khác, chỉ thêm nếu không có tin nhắn tương tự
+      else {
+        // Kiểm tra xem đã có tin nhắn tạm thời tương tự chưa
+        final hasSimilarTempMessage = updatedMessages.any((m) => 
+          m.type == MessageType.image && 
+          m.senderId == message.senderId &&
+          m.content.contains('[Đang gửi') && 
+          m.imageUrl == null);
+          
+        if (!hasSimilarTempMessage) {
+          print('Adding new temporary image message');
+          updatedMessages.add(message);
+        } else {
+          print('Skipping duplicate temporary image message');
+        }
+      }
     }
 
     // Sắp xếp tin nhắn theo thời gian
     updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
 
+    // Gọi phương thức loại bỏ tin nhắn ảnh trùng lặp
+    final deduplicatedMessages = _deduplicateImageMessages(updatedMessages);
+
     // Cập nhật state để trigger rebuild
-    emit(state.copyWith(messages: updatedMessages));
+    emit(state.copyWith(messages: deduplicatedMessages));
   }
 
   Future<void> sendMessage(String content) async {
@@ -172,6 +255,43 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     loadMessages();
   }
 
+  // Phương thức mới để loại bỏ các tin nhắn ảnh trùng lặp
+  List<Message> _deduplicateImageMessages(List<Message> messages) {
+    // Sắp xếp tin nhắn theo thời gian trước
+    final sortedMessages = List<Message>.from(messages)
+      ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    
+    final result = <Message>[];
+    final processedImageIds = <String>{};
+    
+    // Xử lý từng tin nhắn theo thứ tự thời gian
+    for (final message in sortedMessages) {
+      // Tạo ID duy nhất cho tin nhắn ảnh dựa trên URL và ID tin nhắn
+      final messageUniqueKey = message.type == MessageType.image 
+          ? '${message.id}_${message.imageUrl ?? "null"}'
+          : message.id.toString();
+      
+      // Nếu là tin nhắn ảnh có URL đã xử lý, bỏ qua
+      if (message.type == MessageType.image && 
+          message.imageUrl != null && 
+          processedImageIds.contains(messageUniqueKey)) {
+        print('Skipping duplicate image message: $messageUniqueKey');
+        continue;
+      }
+      
+      // Đánh dấu đã xử lý và thêm vào kết quả
+      if (message.type == MessageType.image && message.imageUrl != null) {
+        processedImageIds.add(messageUniqueKey);
+      }
+      
+      result.add(message);
+    }
+    
+    // Sắp xếp lại kết quả theo thời gian để đảm bảo thứ tự đúng
+    result.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+    return result;
+  }
+
   Future<void> sendImage() async {
     try {
       print('Attempting to pick image using Image Picker directly');
@@ -195,40 +315,60 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
       final file = File(pickedFile.path);
       _lastImageFile = file;
 
+      // Tạo ID ngẫu nhiên cho mỗi lần gửi ảnh để đảm bảo mỗi lần gửi đều là duy nhất
+      final sendId = DateTime.now().millisecondsSinceEpoch.toString() + '_' + 
+                     DateTime.now().microsecondsSinceEpoch.toString();
+      
       print('Selected file: ${file.path}, size: ${await file.length()} bytes');
+      print('Generated unique send ID: $sendId');
 
+      // Tạo tin nhắn tạm thời cho phiên gửi ảnh này
+      final tempMessage = Message(
+        id: int.parse(sendId.substring(0, 10)), // Đảm bảo ID không trùng lặp
+        senderId: _chatService.currentUserId!,
+        receiverId: receiverId,
+        content: '[Đang gửi hình ảnh...]',
+        sentAt: DateTime.now(),
+        isRead: false,
+        type: MessageType.image,
+      );
+      
+      // Thêm tin nhắn tạm thời vào danh sách
+      final updatedMessages = List<Message>.from(state.messages)..add(tempMessage);
+      emit(state.copyWith(messages: updatedMessages, isSending: true));
+      
       try {
-        // Tạo ID duy nhất cho tin nhắn hình ảnh này
-        final uniqueId = DateTime.now().millisecondsSinceEpoch;
-        
-        // Tạo danh sách tin nhắn mới và loại bỏ tin nhắn hình ảnh đang gửi trước đó
-        final updatedMessages = List<Message>.from(state.messages);
-        updatedMessages.removeWhere((m) => 
-          m.type == MessageType.image && 
-          m.imageUrl == null && 
-          m.senderId == _chatService.currentUserId
-        );
-        
-        // Thêm tin nhắn tạm thời
-        final tempMessage = Message(
-          id: uniqueId,
-          senderId: _chatService.currentUserId!,
-          receiverId: receiverId,
-          content: '[Đang gửi...]',
-          sentAt: DateTime.now(),
-          isRead: false,
-          type: MessageType.image,
-          imageUrl: null,
-        );
-        
-        updatedMessages.add(tempMessage);
-        emit(state.copyWith(messages: updatedMessages));
-        
+        // Gửi ảnh không đợi bất kỳ delay nào
         await _chatService.sendImageMessage(receiverId, file);
+        
+        // Sau khi gửi xong, chỉ cập nhật trạng thái gửi
         emit(state.copyWith(isSending: false));
       } catch (e) {
         print('Error sending image: $e');
-        emit(state.copyWith(isSending: false, error: 'Lỗi khi gửi ảnh: $e'));
+        
+        // Khi có lỗi, cập nhật tin nhắn tạm thời thành tin nhắn lỗi
+        final errorMessageIndex = updatedMessages.indexWhere(
+          (m) => m.id == tempMessage.id
+        );
+        
+        if (errorMessageIndex >= 0) {
+          // Cập nhật tin nhắn lỗi
+          updatedMessages[errorMessageIndex] = Message(
+            id: tempMessage.id,
+            senderId: _chatService.currentUserId!,
+            receiverId: receiverId,
+            content: '[Lỗi: không thể gửi hình ảnh]',
+            sentAt: DateTime.now(),
+            isRead: false,
+            type: MessageType.text,
+          );
+        }
+        
+        emit(state.copyWith(
+          messages: updatedMessages,
+          isSending: false, 
+          error: 'Lỗi khi gửi ảnh: $e'
+        ));
       }
     } catch (e) {
       print('Error picking image: $e');
@@ -284,11 +424,21 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
 
       final imageFile = File(pickedFile.path);
       await _chatService.sendImageMessage(receiverId, imageFile);
-      
+
       emit(state.copyWith(isSending: false));
     } catch (e) {
       print('Error picking image: $e');
       emit(state.copyWith(isSending: false, error: 'Lỗi khi chọn ảnh: $e'));
+    }
+  }
+
+  void sendTypingStatus(String userId, bool isTyping) {
+    try {
+      final updatedTypingStatus = Map<String, bool>.from(state.typingStatus);
+      updatedTypingStatus[userId] = isTyping;
+      emit(state.copyWith(typingStatus: updatedTypingStatus));
+    } catch (e) {
+      print('Error sending typing status: $e');
     }
   }
 } 

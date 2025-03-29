@@ -25,10 +25,14 @@ class AuthCubit extends Cubit<AuthState> {
     final accessToken = prefs.getString(KEY_ACCESS_TOKEN);
     final refreshToken = prefs.getString(KEY_REFRESH_TOKEN);
     final userId = prefs.getString(KEY_USER_ID);
+    final fullName = prefs.getString(KEY_FULL_NAME);
+    final email = prefs.getString(KEY_EMAIL);
 
-    // print('Checking auth status...');
-    // print('Access token exists: ${accessToken != null}');
-    // print('Refresh token exists: ${refreshToken != null}');
+    print('Checking auth status...');
+    print('Access token exists: ${accessToken != null}');
+    print('Refresh token exists: ${refreshToken != null}');
+    print('UserId exists: ${userId != null}');
+    print('FullName exists: ${fullName != null}');
 
     if (accessToken != null && refreshToken != null) {
       // Kiểm tra token hết hạn
@@ -58,15 +62,19 @@ class AuthCubit extends Cubit<AuthState> {
         return;
       }
 
-      // print('Token still valid, maintaining session');
+      print('Token still valid, maintaining session');
       // Token còn hạn, emit state bình thường
       final response = {
         'success': true,
+        'isAuthenticated': true,
         'accessToken': accessToken,
         'refreshToken': refreshToken,
         'userId': userId,
+        'fullName': fullName,
+        'email': email,
       };
 
+      print('Emitting auth state with response: $response');
       emit(AuthState.fromJson(response));
     } else {
       print('No tokens found, user not authenticated');
@@ -146,6 +154,8 @@ class AuthCubit extends Cubit<AuthState> {
         ...response,
         'fullName': fullName,
         'email': email,
+        'success': true,
+        'isAuthenticated': true,
       });
       
       // Lưu userId nếu có

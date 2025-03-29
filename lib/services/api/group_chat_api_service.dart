@@ -59,12 +59,11 @@ class GroupChatApiService {
         '/api/group',
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (status) => true, // Allow all status codes to check error messages
+          validateStatus: (status) => true,
         ),
       );
       
       print('GetMyGroups response status: ${response.statusCode}');
-      print('GetMyGroups response headers: ${response.headers}');
       print('GetMyGroups response data: ${response.data}');
       
       if (response.statusCode != 200) {
@@ -75,40 +74,47 @@ class GroupChatApiService {
         throw Exception('Null response data from server');
       }
       
+      List<GroupChat> groups = [];
+      
       if (response.data is List) {
-        final groups = (response.data as List)
-            .map((json) {
-              try {
-                return GroupChat.fromJson(json);
-              } catch (e) {
-                print('Error parsing group: $e, data: $json');
-                return null;
-              }
-            })
-            .whereType<GroupChat>() // Filter out nulls
-            .toList();
-        return groups;
+        groups = await _processGroupList(response.data as List);
       } else if (response.data is Map && response.data.containsKey('groups')) {
-        final groups = (response.data['groups'] as List)
-            .map((json) {
-              try {
-                return GroupChat.fromJson(json);
-              } catch (e) {
-                print('Error parsing group from groups array: $e, data: $json');
-                return null;
-              }
-            })
-            .whereType<GroupChat>() // Filter out nulls
-            .toList();
-        return groups;
+        groups = await _processGroupList(response.data['groups'] as List);
       } else {
         throw Exception('Invalid response format: ${response.data.runtimeType}');
       }
+
+      // Lấy số lượng thành viên cho mỗi nhóm
+      final updatedGroups = <GroupChat>[];
+      for (var group in groups) {
+        try {
+          final members = await getGroupMembers(group.id);
+          updatedGroups.add(group.copyWith(memberCount: members.length));
+        } catch (e) {
+          print('Error getting member count for group ${group.id}: $e');
+          updatedGroups.add(group); // Giữ nguyên group nếu không lấy được số thành viên
+        }
+      }
+
+      return updatedGroups;
     } catch (e) {
       print('Failed to get groups: $e');
-      print(e.toString());
       throw Exception('Failed to get groups: $e');
     }
+  }
+
+  Future<List<GroupChat>> _processGroupList(List rawGroups) async {
+    return rawGroups
+        .map((json) {
+          try {
+            return GroupChat.fromJson(json);
+          } catch (e) {
+            print('Error parsing group: $e, data: $json');
+            return null;
+          }
+        })
+        .whereType<GroupChat>()
+        .toList();
   }
 
   Future<GroupChat> createGroup({

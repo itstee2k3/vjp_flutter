@@ -1,50 +1,19 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/models/group_chat.dart';
 import '../../../../services/api/group_chat_api_service.dart';
-
-class GroupChatListState {
-  final List<GroupChat> groups;
-  final bool isLoading;
-  final String? error;
-  final String searchQuery;
-
-  GroupChatListState({
-    this.groups = const [],
-    this.isLoading = false,
-    this.error,
-    this.searchQuery = '',
-  });
-
-  GroupChatListState copyWith({
-    List<GroupChat>? groups,
-    bool? isLoading,
-    String? error,
-    String? searchQuery,
-  }) {
-    return GroupChatListState(
-      groups: groups ?? this.groups,
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-      searchQuery: searchQuery ?? this.searchQuery,
-    );
-  }
-}
+import 'group_chat_list_state.dart';
 
 class GroupChatListCubit extends Cubit<GroupChatListState> {
   final GroupChatApiService _apiService;
 
-  GroupChatListCubit({
-    required GroupChatApiService apiService,
-  }) : _apiService = apiService,
-       super(GroupChatListState()) {
+  GroupChatListCubit(this._apiService) : super(GroupChatListState.initial()) {
     loadGroups();
   }
 
-  Future<void> loadGroups([GroupChatApiService? apiService]) async {
+  Future<void> loadGroups() async {
     try {
       emit(state.copyWith(isLoading: true));
-      final service = apiService ?? _apiService;
-      final groups = await service.getMyGroups();
+      final groups = await _apiService.getMyGroups();
       emit(state.copyWith(
         groups: groups,
         isLoading: false,
@@ -57,13 +26,19 @@ class GroupChatListCubit extends Cubit<GroupChatListState> {
     }
   }
 
-  Future<void> createGroup(String name, String? description) async {
+  Future<void> createGroup({
+    required String name,
+    String? avatar,
+    required List<String> memberIds,
+  }) async {
     try {
       emit(state.copyWith(isLoading: true));
       final newGroup = await _apiService.createGroup(
         name: name,
-        memberIds: [], // You'll need to provide member IDs when creating a group
+        avatar: avatar,
+        memberIds: memberIds,
       );
+      
       final updatedGroups = List<GroupChat>.from(state.groups)..add(newGroup);
       emit(state.copyWith(
         groups: updatedGroups,
@@ -77,18 +52,24 @@ class GroupChatListCubit extends Cubit<GroupChatListState> {
     }
   }
 
-  void setSearchQuery(String query) {
-    emit(state.copyWith(searchQuery: query));
+  void searchGroups(String query) {
+    if (query.isEmpty) {
+      loadGroups();
+      return;
+    }
+
+    final filteredGroups = state.groups
+        .where((group) =>
+            group.name.toLowerCase().contains(query.toLowerCase()) ||
+            (group.description?.toLowerCase().contains(query.toLowerCase()) ?? false))
+        .toList();
+
+    emit(state.copyWith(groups: filteredGroups));
   }
 
-  List<GroupChat> get filteredGroups {
-    if (state.searchQuery.isEmpty) {
-      return state.groups;
-    }
-    return state.groups.where((group) =>
-      group.name.toLowerCase().contains(state.searchQuery.toLowerCase()) ||
-      (group.description?.toLowerCase().contains(state.searchQuery.toLowerCase()) ?? false)
-    ).toList();
+  void resetAndReloadGroups() {
+    emit(GroupChatListState.initial());
+    loadGroups();
   }
 
   @override

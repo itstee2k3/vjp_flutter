@@ -49,6 +49,7 @@ class AuthState {
     String? userId = json['userId'];
     String? fullName = json['fullName'];
     String? email = json['email'];
+    bool isAuthenticated = json['isAuthenticated'] ?? false;
 
     if (json['accessToken'] != null) {
       try {
@@ -72,6 +73,9 @@ class AuthState {
           // Get email from token if not provided
           email = email ?? 
                   payloadMap['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'];
+                  
+          // If we have a valid token, we are authenticated
+          isAuthenticated = true;
         }
       } catch (e) {
         print('Error extracting data from token: $e');
@@ -81,7 +85,7 @@ class AuthState {
     // print('Parsed AuthState - fullName: $fullName, userId: $userId, email: $email');
 
     return AuthState(
-      isAuthenticated: json['success'] ?? false,
+      isAuthenticated: isAuthenticated,
       accessToken: json['accessToken'],
       refreshToken: json['refreshToken'],
       fullName: fullName ?? 'User',

@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_socket_io/services/api/chat_api_service.dart';
+import 'package:flutter_socket_io/features/auth/cubits/auth_cubit.dart';
+import 'package:flutter_socket_io/features/chat/cubits/group/group_chat_list_cubit.dart';
+import 'package:flutter_socket_io/services/api/group_chat_api_service.dart';
+import 'package:flutter_socket_io/services/api/api_service.dart';
+import 'package:flutter_socket_io/features/main/cubits/main_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'features/auth/cubits/auth_cubit.dart';
-import 'features/chat/cubits/personal/personal_chat_list_cubit.dart';
-import 'features/chat/cubits/group/group_chat_list_cubit.dart';
-import 'services/api/api_service.dart';
-import 'services/api/group_chat_api_service.dart';
-import 'features/home/cubits/home_cubit.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'features/main/cubits/main_cubit.dart';
-import 'features/main/screens/main_screen.dart';
+
+import 'core/config/router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  
   final prefs = await SharedPreferences.getInstance();
   final apiService = ApiService();
 
@@ -42,69 +39,46 @@ class MyApp extends StatelessWidget {
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider(
+          BlocProvider<AuthCubit>(
             create: (context) => AuthCubit(
               prefs: prefs,
-              apiService: apiService,
-            )..checkAuthStatus(),
+              apiService: context.read<ApiService>(),
+            ),
           ),
-          BlocProvider(
-            create: (context) {
-              final authCubit = context.read<AuthCubit>();
-              return PersonalChatListCubit(
-                ChatApiService(
-                  token: authCubit.state.accessToken,
-                  currentUserId: authCubit.state.userId,
-                ),
-                authCubit: authCubit,
-              );
-            },
-          ),
-          BlocProvider(
-            create: (context) {
-              final authCubit = context.read<AuthCubit>();
-              return GroupChatListCubit(
-                apiService: GroupChatApiService(
-                  token: authCubit.state.accessToken,
-                  currentUserId: authCubit.state.userId,
-                ),
-              );
-            },
-          ),
-          BlocProvider(
-            create: (context) => HomeCubit(),
-          ),
-          BlocProvider(
+          BlocProvider<MainCubit>(
             create: (context) => MainCubit(),
           ),
-        ],
-        child: MaterialApp(
-          title: 'VJP Connect',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            primarySwatch: Colors.blue,
-            textTheme: GoogleFonts.robotoTextTheme(
-              Theme.of(context).textTheme,
-            ),
-            iconTheme: const IconThemeData(
-              color: Colors.black87,
-              size: 24.0,
-            ),
-            appBarTheme: const AppBarTheme(
-              iconTheme: IconThemeData(
-                color: Colors.white,
-                size: 24.0,
-              ),
-            ),
-            bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-              selectedItemColor: Colors.blue,
-              unselectedItemColor: Colors.grey,
-              selectedIconTheme: IconThemeData(size: 24.0),
-              unselectedIconTheme: IconThemeData(size: 24.0),
-            ),
+          BlocProvider<GroupChatListCubit>(
+            create: (context) {
+              final authCubit = context.read<AuthCubit>();
+              final token = authCubit.state.accessToken;
+              final userId = authCubit.state.userId;
+
+              if (token == null || token.isEmpty || userId == null) {
+                throw Exception('User not authenticated');
+              }
+
+              final groupChatApiService = GroupChatApiService(
+                token: token,
+                currentUserId: userId,
+              );
+
+              return GroupChatListCubit(groupChatApiService)..loadGroups();
+            },
           ),
-          home: const MainScreen(),
-          showPerformanceOverlay: false,
+        ],
+        child: Builder(
+          builder: (context) {
+            return MaterialApp.router(
+              title: 'VJP Connect',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                primarySwatch: Colors.blue,
+                useMaterial3: true,
+              ),
+              routerConfig: router,
+            );
+          },
         ),
       ),
     );

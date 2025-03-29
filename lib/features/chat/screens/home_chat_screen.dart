@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_socket_io/features/chat/widgets/create_group_form.dart';
 import '../../../services/api/chat_api_service.dart';
 import '../../../services/api/group_chat_api_service.dart';
 import '../../../data/models/user.dart';
@@ -7,12 +8,13 @@ import '../../../data/models/group_chat.dart';
 import '../../auth/cubits/auth_cubit.dart';
 import '../cubits/personal/personal_chat_list_cubit.dart';
 import '../cubits/group/group_chat_list_cubit.dart';
+import '../cubits/group/group_chat_list_state.dart';
 import 'personal/personal_list_screen.dart';
 import 'group/group_list_screen.dart';
 import '../cubits/personal/personal_chat_cubit.dart';
 import '../cubits/group/group_chat_cubit.dart';
 import 'personal/personal_message_screen.dart';
-import 'group/group_chat_screen.dart';
+import 'group/group_message_screen.dart';
 
 class HomeChatScreen extends StatefulWidget {
   const HomeChatScreen({Key? key}) : super(key: key);
@@ -58,7 +60,7 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
       
       print('Loading groups with service...');
       if (context.read<GroupChatListCubit>().state.groups.isEmpty) {
-        context.read<GroupChatListCubit>().loadGroups(groupChatService);
+        context.read<GroupChatListCubit>().loadGroups();
       }
     } else {
       print('Cannot initialize chat services: token or userId is null');
@@ -141,62 +143,12 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
             ),
             groupId: group.id,
           ),
-          child: GroupChatScreen(
+          child: GroupMessageScreen(
             groupName: group.name,
             groupId: group.id,
           ),
         ),
       ),
-    );
-  }
-
-  void _showCreateGroupDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final nameController = TextEditingController();
-        final descriptionController = TextEditingController();
-
-        return AlertDialog(
-          title: const Text('Create New Group'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Group Name',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final name = nameController.text.trim();
-                final description = descriptionController.text.trim();
-                if (name.isNotEmpty) {
-                  context.read<GroupChatListCubit>().createGroup(name, description);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -208,6 +160,7 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black), // Đặt màu icon về đen
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.black,
@@ -251,11 +204,7 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
                 return Center(child: Text(state.error!));
               }
 
-              return GroupListScreen(
-                onGroupTap: (group) {
-                  _handleGroupTap(context, group);
-                },
-              );
+              return const GroupListScreen();
             },
           ),
         ],
@@ -265,7 +214,10 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
           if (_tabController.index == 0) {
             // Show new chat dialog
           } else {
-            _showCreateGroupDialog();
+            showDialog(
+              context: context,
+              builder: (context) => const CreateGroupForm(),
+            );
           }
         },
         child: const Icon(Icons.add),
