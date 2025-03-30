@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../data/models/group_chat.dart';
 import '../../../../data/models/message.dart';
 import '../../cubits/group/group_chat_list_cubit.dart';
@@ -83,14 +84,15 @@ class GroupListScreen extends StatelessWidget {
                   )
                 : null,
               onTap: () {
-                Navigator.pushNamed(
-                  context,
-                  '/group-message',
-                  arguments: {
-                    'groupName': group.name,
-                    'groupId': group.id,
-                  },
-                );
+                // Navigator.pushNamed(
+                //   context,
+                //   '/group-message',
+                //   arguments: {
+                //     'groupName': group.name,
+                //     'groupId': group.id,
+                //   },
+                // );
+                context.push('/group-message/${group.id}?groupName=${Uri.encodeComponent(group.name)}');
               },
             );
           },

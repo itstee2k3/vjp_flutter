@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../data/models/user.dart';
 import '../../../../data/models/message.dart';
 import '../../cubits/personal/personal_chat_list_cubit.dart';
@@ -77,7 +78,11 @@ class PersonalListScreen extends StatelessWidget {
                     ],
                   )
                 : null,
-              onTap: () => onMessageTap(user),
+              // onTap: () => onMessageTap(user),
+              onTap: () {
+                context.push('/message/${user.id}');
+              },
+
             );
           },
         );
