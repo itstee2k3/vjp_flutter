@@ -7,12 +7,7 @@ import '../../cubits/personal/personal_chat_list_cubit.dart';
 import '../../../../features/auth/cubits/auth_cubit.dart';
 
 class PersonalListScreen extends StatelessWidget {
-  final Function(User) onMessageTap;
-
-  const PersonalListScreen({
-    Key? key,
-    required this.onMessageTap,
-  }) : super(key: key);
+  const PersonalListScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -78,11 +73,9 @@ class PersonalListScreen extends StatelessWidget {
                     ],
                   )
                 : null,
-              // onTap: () => onMessageTap(user),
               onTap: () {
-                context.push('/message/${user.id}');
+                context.push('/chat/personal/${user.id}?username=${Uri.encodeComponent(user.fullName)}');
               },
-
             );
           },
         );

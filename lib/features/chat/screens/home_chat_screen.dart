@@ -186,11 +186,7 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
                 return Center(child: Text(state.error!));
               }
 
-              return PersonalListScreen(
-                onMessageTap: (user) {
-                  _handleUserTap(context, user);
-                },
-              );
+              return const PersonalListScreen();
             },
           ),
           // Group Chats Tab

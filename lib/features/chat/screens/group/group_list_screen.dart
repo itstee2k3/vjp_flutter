@@ -84,15 +84,7 @@ class GroupListScreen extends StatelessWidget {
                   )
                 : null,
               onTap: () {
-                // Navigator.pushNamed(
-                //   context,
-                //   '/group-message',
-                //   arguments: {
-                //     'groupName': group.name,
-                //     'groupId': group.id,
-                //   },
-                // );
-                context.push('/group-message/${group.id}?groupName=${Uri.encodeComponent(group.name)}');
+                context.push('/chat/group/${group.id}?groupName=${Uri.encodeComponent(group.name)}');
               },
             );
           },
