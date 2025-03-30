@@ -19,7 +19,7 @@ class ImageMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget imageContent;
-    
+
     if (message.isSending) {
       imageContent = _buildSendingState();
     } else if (message.isError) {
@@ -29,7 +29,7 @@ class ImageMessageBubble extends StatelessWidget {
     } else {
       imageContent = _buildUnknownState();
     }
-    
+
     return Container(
       margin: EdgeInsets.symmetric(vertical: 4),
       child: Align(
@@ -123,7 +123,7 @@ class ImageMessageBubble extends StatelessWidget {
   Widget _buildImageContent(BuildContext context) {
     final uniqueKey = Key('image_${message.id}_${message.imageUrl}_${DateTime.now().millisecondsSinceEpoch}');
     final uniqueCacheKey = 'image_${message.id}_${message.imageUrl}';
-    
+
     return GestureDetector(
       onTap: () => _showFullScreenImage(context),
       child: Column(

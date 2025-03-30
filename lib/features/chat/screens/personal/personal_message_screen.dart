@@ -1,15 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:signalr_netcore/hub_connection.dart';
-import '../../../../data/models/message.dart';
 import '../../cubits/personal/personal_chat_cubit.dart';
 import '../../cubits/personal/personal_chat_state.dart';
+import '../../widgets/chat_header.dart';
 import '../../widgets/chat_input_field.dart';
 import '../../widgets/message_list.dart';
-import '../../widgets/text_message_bubble.dart';
-import '../../widgets/image_message_bubble.dart';
 
 class PersonalMessageScreen extends StatefulWidget {
   final String username;
@@ -28,8 +24,6 @@ class PersonalMessageScreen extends StatefulWidget {
 class _PersonalMessageScreenState extends State<PersonalMessageScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isTyping = false;
-  Timer? _typingTimer;
   bool _isLoading = false;
 
   @override
@@ -44,7 +38,6 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _typingTimer?.cancel();
     super.dispose();
   }
 
@@ -105,58 +98,24 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> {
     }
   }
 
-  void _handleTyping(String text) {
-    if (!_isTyping) {
-      _isTyping = true;
-      context.read<PersonalChatCubit>().sendTypingStatus(widget.userId, true);
-    }
-
-    _typingTimer?.cancel();
-    _typingTimer = Timer(const Duration(seconds: 2), () {
-      _isTyping = false;
-      context.read<PersonalChatCubit>().sendTypingStatus(widget.userId, false);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              child: Text(widget.username[0].toUpperCase()),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.username),
-                  BlocBuilder<PersonalChatCubit, PersonalChatState>(
-                    builder: (context, state) {
-                      if (state.typingStatus[widget.userId] == true) {
-                        return const Text(
-                          'Đang nhập...',
-                          style: TextStyle(fontSize: 12),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(kToolbarHeight),
+        child: BlocBuilder<PersonalChatCubit, PersonalChatState>(
+          builder: (context, state) {
+            return ChatHeader(
+              title: widget.username,
+              onRefreshPressed: () {
+                context.read<PersonalChatCubit>().resetAndReloadMessages();
+              },
+              onInfoPressed: () {
+                // TODO: Navigate to group info screen
+              },
+            );
+          },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<PersonalChatCubit>().resetAndReloadMessages();
-            },
-          ),
-        ],
       ),
       body: BlocBuilder<PersonalChatCubit, PersonalChatState>(
         builder: (context, state) {
@@ -167,73 +126,20 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> {
           return Column(
             children: [
               Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(8),
-                  itemCount: state.messages.length,
-                  itemBuilder: (context, index) {
-                    final message = state.messages[index];
-                    final isMe = message.senderId == context.read<PersonalChatCubit>().chatService.currentUserId;
-                    final showAvatar = index == 0 ||
-                        state.messages[index - 1].senderId != message.senderId;
-
-                    if (message.type == MessageType.image) {
-                      return ImageMessageBubble(
-                        message: message,
-                        isMe: isMe,
-                        onRetry: () => context.read<PersonalChatCubit>().retryImage(),
-                      );
-                    }
-
-                    return TextMessageBubble(
-                      message: message,
-                      isMe: isMe,
-                    );
+                child: MessageList(
+                  messages: state.messages,
+                  currentUserId: context.read<PersonalChatCubit>().chatService.currentUserId ?? '',
+                  scrollController: _scrollController,
+                  onRetryImage: () {
+                    // TODO: Implement retry image for group chat
                   },
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: SafeArea(
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.photo),
-                        onPressed: _sendImage,
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: _messageController,
-                          decoration: const InputDecoration(
-                            hintText: 'Nhập tin nhắn...',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                          ),
-                          onChanged: _handleTyping,
-                          onSubmitted: (_) => _sendMessage(),
-                          textCapitalization: TextCapitalization.sentences,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.send),
-                        onPressed: _sendMessage,
-                      ),
-                    ],
-                  ),
-                ),
+              ChatInputField(
+                controller: _messageController,
+                onSend: _sendMessage,
+                onImageSend: _sendImage,
+                isLoading: _isLoading,
               ),
             ],
           );
