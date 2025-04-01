@@ -8,13 +8,24 @@ class ImageMessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
   final VoidCallback? onRetry;
+  final Function(Message)? onRetryWithMessage;
 
   const ImageMessageBubble({
     Key? key,
     required this.message,
     required this.isMe,
     this.onRetry,
+    this.onRetryWithMessage,
   }) : super(key: key);
+
+  // Helper method to call the appropriate retry callback
+  void _handleRetry() {
+    if (onRetryWithMessage != null) {
+      onRetryWithMessage!(message);
+    } else if (onRetry != null) {
+      onRetry!();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +42,11 @@ class ImageMessageBubble extends StatelessWidget {
     }
 
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
-          padding: EdgeInsets.all(4),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: isMe ? Colors.blue : Colors.grey[200],
             borderRadius: BorderRadius.circular(16),
@@ -90,14 +101,14 @@ class ImageMessageBubble extends StatelessWidget {
         color: Colors.red[100],
         borderRadius: BorderRadius.circular(8),
       ),
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.error, color: Colors.red),
-              SizedBox(width: 8),
+              const Icon(Icons.error, color: Colors.red),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   message.content,
@@ -108,11 +119,11 @@ class ImageMessageBubble extends StatelessWidget {
               ),
             ],
           ),
-          if (onRetry != null) ...[
-            SizedBox(height: 8),
+          if (onRetry != null || onRetryWithMessage != null) ...[
+            const SizedBox(height: 8),
             TextButton(
-              onPressed: onRetry,
-              child: Text('Thử lại'),
+              onPressed: _handleRetry,
+              child: const Text('Thử lại'),
             ),
           ],
         ],
@@ -141,22 +152,20 @@ class ImageMessageBubble extends StatelessWidget {
                 width: 200,
                 height: 200,
                 color: isMe ? Colors.blue.withOpacity(0.3) : Colors.grey[300],
-                child: Center(
+                child: const Center(
                   child: CircularProgressIndicator(),
                 ),
               ),
               errorWidget: (context, url, error) => GestureDetector(
                 onTap: () {
                   CachedNetworkImage.evictFromCache(url);
-                  if (onRetry != null) {
-                    onRetry!();
-                  }
+                  _handleRetry();
                 },
                 child: Container(
                   width: 200,
                   height: 200,
                   color: isMe ? Colors.blue.withOpacity(0.3) : Colors.grey[300],
-                  child: Center(
+                  child: const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -177,7 +186,7 @@ class ImageMessageBubble extends StatelessWidget {
               memCacheHeight: 800,
               maxWidthDiskCache: 800,
               fadeOutDuration: Duration.zero,
-              fadeInDuration: Duration(milliseconds: 200),
+              fadeInDuration: const Duration(milliseconds: 200),
               useOldImageOnUrlChange: true,
             ),
           ),
@@ -199,7 +208,7 @@ class ImageMessageBubble extends StatelessWidget {
 
   Widget _buildUnknownState() {
     return GestureDetector(
-      onTap: onRetry,
+      onTap: _handleRetry,
       child: Container(
         width: 200,
         height: 100,
@@ -218,10 +227,10 @@ class ImageMessageBubble extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey[800]),
               ),
-              if (onRetry != null) ...[
+              if (onRetry != null || onRetryWithMessage != null) ...[
                 SizedBox(height: 8),
                 TextButton(
-                  onPressed: onRetry,
+                  onPressed: _handleRetry,
                   child: Text('Tải lại'),
                   style: TextButton.styleFrom(
                     minimumSize: Size(100, 30),

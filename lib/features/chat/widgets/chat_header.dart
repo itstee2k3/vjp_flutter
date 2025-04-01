@@ -42,10 +42,10 @@ class ChatHeader extends StatelessWidget {
         ],
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: onRefreshPressed,
-        ),
+        // IconButton(
+        //   icon: const Icon(Icons.refresh),
+        //   onPressed: onRefreshPressed,
+        // ),
         if (onInfoPressed != null)
           IconButton(
             icon: const Icon(Icons.info_outline),

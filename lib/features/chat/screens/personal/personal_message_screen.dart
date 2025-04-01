@@ -1,11 +1,11 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubits/personal/personal_chat_cubit.dart';
 import '../../cubits/personal/personal_chat_state.dart';
-import '../../widgets/chat_header.dart';
 import '../../widgets/chat_input_field.dart';
 import '../../widgets/message_list.dart';
+import '../../widgets/chat_header.dart';
+import '../../mixins/chat_screen_mixin.dart';
 
 class PersonalMessageScreen extends StatefulWidget {
   final String username;
@@ -21,81 +21,13 @@ class PersonalMessageScreen extends StatefulWidget {
   State<PersonalMessageScreen> createState() => _PersonalMessageScreenState();
 }
 
-class _PersonalMessageScreenState extends State<PersonalMessageScreen> {
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  bool _isLoading = false;
+class _PersonalMessageScreenState extends State<PersonalMessageScreen> with ChatScreenMixin {
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
-    _setupMessageStream();
-    _scrollToBottom();
-  }
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  Future<void> _loadMessages() async {
-    setState(() => _isLoading = true);
-    try {
-      await context.read<PersonalChatCubit>().loadMessages();
-    } catch (e) {
-      print('Error loading messages: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  void _setupMessageStream() {
-    final chatCubit = context.read<PersonalChatCubit>();
-    chatCubit.stream.listen((state) {
-      if (state.messages.isNotEmpty && mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
-      }
-    });
-  }
-
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-
-    final content = _messageController.text.trim();
-    _messageController.clear();
-
-    try {
-      context.read<PersonalChatCubit>().sendMessage(content);
-      _scrollToBottom();
-    } catch (e) {
-      print('Error sending message: $e');
-    }
-  }
-
-  Future<void> _sendImage() async {
-    try {
-      await context.read<PersonalChatCubit>().sendImage();
-      _scrollToBottom();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi khi gửi ảnh: $e')),
-      );
-    }
+    loadMessages(() => context.read<PersonalChatCubit>().loadMessages());
+    setupMessageStream(context.read<PersonalChatCubit>().stream);
   }
 
   @override
@@ -109,9 +41,6 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> {
               title: widget.username,
               onRefreshPressed: () {
                 context.read<PersonalChatCubit>().resetAndReloadMessages();
-              },
-              onInfoPressed: () {
-                // TODO: Navigate to group info screen
               },
             );
           },
@@ -129,17 +58,18 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> {
                 child: MessageList(
                   messages: state.messages,
                   currentUserId: context.read<PersonalChatCubit>().chatService.currentUserId ?? '',
-                  scrollController: _scrollController,
-                  onRetryImage: () {
-                    // TODO: Implement retry image for group chat
-                  },
+                  scrollController: scrollController,
+                  onRetryImage: () => context.read<PersonalChatCubit>().retryImage(),
+                  hasMoreMessages: state.hasMoreMessages,
+                  isLoadingMore: state.isLoadingMore,
+                  onLoadMore: () => context.read<PersonalChatCubit>().loadMoreMessages(),
                 ),
               ),
               ChatInputField(
-                controller: _messageController,
-                onSend: _sendMessage,
-                onImageSend: _sendImage,
-                isLoading: _isLoading,
+                controller: messageController,
+                onSend: () => sendMessage((content) => context.read<PersonalChatCubit>().sendMessage(content)),
+                onImageSend: () => sendImage(() => context.read<PersonalChatCubit>().sendImage()),
+                isLoading: isLoading,
               ),
             ],
           );
