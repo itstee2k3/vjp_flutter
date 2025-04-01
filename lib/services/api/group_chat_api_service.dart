@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../../data/models/group_chat.dart';
 import '../../data/models/message.dart';
@@ -16,6 +17,9 @@ class GroupChatApiService {
   final _messageController = StreamController<Message>.broadcast();
   late final HubConnection _hubConnection;
   final Dio _dio;
+  final Set<String> _processedMessageIds = {};
+  final Map<int, DateTime> _lastImageSentTime = {};
+  final Duration _minimumImageSendInterval = Duration(seconds: 2);
 
   Stream<Message> get onMessageReceived => _messageController.stream;
 
@@ -40,14 +44,97 @@ class GroupChatApiService {
 
     _hubConnection.on('ReceiveGroupMessage', (List<Object?>? args) {
       if (args != null && args.isNotEmpty) {
-        final messageJson = args[0] as Map<String, dynamic>;
-        final message = Message.fromJson(messageJson);
-        _messageController.add(message);
+        try {
+          print('Received group message data: ${args[0]}');
+          final messageJson = args[0] as Map<String, dynamic>;
+          
+          // Kiểm tra xem tin nhắn có phải là hình ảnh không
+          final bool isImageMessage = messageJson['type'] == 'image' || 
+                                   (messageJson['imageUrl'] != null && messageJson['imageUrl'].toString().isNotEmpty);
+          
+          // Tạo ID duy nhất cho tin nhắn để theo dõi trùng lặp
+          String messageId;
+          if (isImageMessage) {
+            // Với tin nhắn hình ảnh, tạo ID đặc biệt bao gồm cả imageUrl
+            final imageUrl = messageJson['imageUrl'] ?? '';
+            // Chỉ lấy 20 ký tự đầu của imageUrl để tránh ID quá dài
+            final shortenedUrl = imageUrl.toString().length > 20 
+                ? imageUrl.toString().substring(0, 20) 
+                : imageUrl.toString();
+            messageId = '${messageJson['id']}-${messageJson['senderId']}-image-${shortenedUrl}';
+          } else {
+            // ID thông thường cho tin nhắn văn bản
+            messageId = '${messageJson['id']}-${messageJson['senderId']}-${messageJson['content']}';
+          }
+          
+          // Kiểm tra tin nhắn đã xử lý chưa
+          if (_processedMessageIds.contains(messageId)) {
+            print('Duplicate SignalR group message detected, ignoring: $messageId');
+            return;
+          }
+          
+          // Thêm kiểm tra trùng lặp bổ sung cho hình ảnh
+          if (isImageMessage) {
+            // Kiểm tra xem có tin nhắn ảnh nào từ cùng người gửi trong 5 giây gần đây không
+            final sentAt = messageJson['sentAt'] != null 
+                ? DateTime.parse(messageJson['sentAt'].toString())
+                : DateTime.now();
+                
+            final similarImageKey = '${messageJson['senderId']}-image-${sentAt.millisecondsSinceEpoch ~/ 5000}';
+            if (_processedMessageIds.contains(similarImageKey)) {
+              print('Similar image message from same sender detected within time window, ignoring');
+              return;
+            }
+            
+            // Đánh dấu khoảng thời gian gửi ảnh này để tránh trùng lặp
+            _processedMessageIds.add(similarImageKey);
+          }
+          
+          // Giới hạn kích thước của set
+          if (_processedMessageIds.length > 200) { // Tăng giới hạn lên 200 để đủ chỗ cho ID ảnh
+            final idsToRemove = _processedMessageIds.take(50).toList();
+            for (var id in idsToRemove) {
+              _processedMessageIds.remove(id);
+            }
+          }
+          
+          // Đánh dấu tin nhắn đã xử lý
+          _processedMessageIds.add(messageId);
+          
+          // Log the raw message data and its groupId type
+          if (messageJson.containsKey('groupId')) {
+            print('GroupId type: ${messageJson['groupId'].runtimeType}, value: ${messageJson['groupId']}');
+          }
+          
+          final message = Message.fromJson(messageJson);
+          print('Processed message groupId type: ${message.groupId.runtimeType}, value: ${message.groupId}');
+          
+          _messageController.add(message);
+        } catch (e) {
+          print('Error processing group message: $e');
+        }
       }
     });
 
     try {
       await _hubConnection.start();
+      print('SignalR connection started');
+      
+      // Join all groups that the user is a member of
+      if (currentUserId != null) {
+        try {
+          final groups = await getMyGroups();
+          print('Joining SignalR groups for groups: ${groups.map((g) => g.id).join(', ')}');
+          
+          for (var group in groups) {
+            final groupName = 'group_${group.id}';
+            await _hubConnection.invoke('JoinRoom', args: [groupName]);
+            print('Joined SignalR room: $groupName');
+          }
+        } catch (e) {
+          print('Error joining group rooms: $e');
+        }
+      }
     } catch (e) {
       print('Error starting SignalR connection: $e');
     }
@@ -197,6 +284,25 @@ class GroupChatApiService {
     try {
       print('Sending group message to group: $groupId');
       
+      final isImageMessage = type == 'image' || (imageUrl != null && imageUrl.isNotEmpty);
+      
+      // Kiểm tra thời gian gửi ảnh gần đây nhất cho nhóm này
+      if (isImageMessage) {
+        final now = DateTime.now();
+        final lastSentTime = _lastImageSentTime[groupId] ?? DateTime(2000); // Mặc định thời gian xa
+        final timeSinceLastSend = now.difference(lastSentTime);
+        
+        if (timeSinceLastSend < _minimumImageSendInterval) {
+          print('Anti-duplicate: Image sent too soon after previous image (${timeSinceLastSend.inMilliseconds}ms). Waiting...');
+          // Chờ đủ thời gian tối thiểu
+          await Future.delayed(_minimumImageSendInterval - timeSinceLastSend);
+          print('Continuing to send after delay');
+        }
+        
+        // Cập nhật thời gian gửi ảnh gần đây nhất
+        _lastImageSentTime[groupId] = DateTime.now();
+      }
+      
       final messageData = {
         'groupChatId': groupId,
         'content': content,
@@ -207,10 +313,12 @@ class GroupChatApiService {
         // If imageUrl is a base64 image, set it directly in content
         messageData['content'] = imageUrl;
         messageData['type'] = 'image';
+        print('Sending base64 image to group $groupId (length: ${imageUrl.length})');
       } else if (imageUrl != null) {
         // If imageUrl is a regular URL, set it as imageUrl
         messageData['imageUrl'] = imageUrl;
         messageData['type'] = 'image';
+        print('Sending image URL to group $groupId: ${imageUrl.substring(0, math.min(50, imageUrl.length))}...');
       }
       
       // Add type if specified and not already set
@@ -218,19 +326,42 @@ class GroupChatApiService {
         messageData['type'] = type;
       }
       
-      print('Sending message data: ${messageData.toString().substring(0, messageData.toString().length > 100 ? 100 : messageData.toString().length)}...');
+      print('Sending message data: ${isImageMessage 
+        ? "${messageData['groupChatId']}, type: ${messageData['type']}, content length: ${messageData['content'].toString().length}" 
+        : messageData.toString().substring(0, math.min(100, messageData.toString().length))}...');
+      
+      // Tạo uniqueId cho tin nhắn này để tránh xử lý trùng lặp
+      final now = DateTime.now();
+      final uniqueId = isImageMessage 
+          ? '$currentUserId-image-${now.millisecondsSinceEpoch ~/ 5000}'
+          : '$currentUserId-${content}-${now.millisecondsSinceEpoch}';
+          
+      _processedMessageIds.add(uniqueId);
+      
+      // Thêm ID khác cho trường hợp ảnh
+      if (isImageMessage) {
+        // Thêm một ID chính xác hơn cho khoảng thời gian 2 giây
+        for (int i = -2; i <= 2; i++) {
+          final timeBasedId = '$currentUserId-image-${now.add(Duration(seconds: i)).millisecondsSinceEpoch ~/ 1000}';
+          _processedMessageIds.add(timeBasedId);
+        }
+      }
       
       final response = await _dio.post(
         '/api/group/send',
         data: messageData,
-        options: Options(headers: _headers),
+        options: Options(
+          headers: _headers,
+          sendTimeout: isImageMessage ? const Duration(seconds: 60) : const Duration(seconds: 15),
+          receiveTimeout: isImageMessage ? const Duration(seconds: 30) : const Duration(seconds: 10),
+        ),
       );
       
       if (response.statusCode != 200) {
         throw Exception('Failed to send group message: HTTP ${response.statusCode}');
       }
       
-      print('Group message sent successfully');
+      print('Group message sent successfully: ${response.data}');
     } catch (e) {
       print('Error sending group message: $e');
       throw Exception('Failed to send message: $e');
@@ -256,21 +387,55 @@ class GroupChatApiService {
       
       print('Uploading image for group: $groupId');
       
+      // Thiết lập timeout dài hơn cho upload ảnh
       final response = await _dio.post(
         '/api/upload/group-image',
         data: formData,
-        options: Options(headers: _headers),
+        options: Options(
+          headers: _headers,
+          sendTimeout: const Duration(seconds: 30), // 30 giây để gửi
+          receiveTimeout: const Duration(seconds: 30), // 30 giây để nhận phản hồi
+        ),
       );
       
       if (response.statusCode != 200) {
         throw Exception('Failed to upload image: HTTP ${response.statusCode}');
       }
       
+      if (response.data == null || !response.data.containsKey('imageUrl')) {
+        throw Exception('Invalid response: Missing imageUrl');
+      }
+      
       final imageUrl = response.data['imageUrl'] as String;
       print('Image uploaded successfully: $imageUrl');
+      
+      // Sau khi upload thành công, tạo thêm các ID với khoảng thời gian khác nhau
+      // để tránh xử lý các tin nhắn trùng lặp trong thời gian ngắn
+      final now = DateTime.now();
+      // Thêm các ID phòng ngừa với khoảng thời gian từ hiện tại đến 3 giây sau
+      for (int i = 0; i <= 3; i++) {
+        final futureTime = now.add(Duration(seconds: i));
+        final timeBasedId = '$currentUserId-image-${futureTime.millisecondsSinceEpoch ~/ 1000}';
+        _processedMessageIds.add(timeBasedId);
+        
+        // Thêm cả ID với độ chính xác thấp hơn
+        final timeBasedId5s = '$currentUserId-image-${futureTime.millisecondsSinceEpoch ~/ 5000}';
+        _processedMessageIds.add(timeBasedId5s);
+      }
+      
       return imageUrl;
     } catch (e) {
       print('Error uploading image: $e');
+      
+      // Nếu gặp lỗi timeout hoặc lỗi mạng, thử fallback về base64
+      if (e.toString().contains('timeout') || 
+          e.toString().contains('network') ||
+          e.toString().contains('connection')) {
+        print('Detected network issue, falling back to base64 encoding');
+        // Thay vì throw exception, ta trả về URL đặc biệt để báo hiệu cần fallback
+        return 'fallback_to_base64';
+      }
+      
       throw Exception('Failed to upload image: $e');
     }
   }
@@ -317,5 +482,6 @@ class GroupChatApiService {
   void dispose() {
     _messageController.close();
     _hubConnection.stop();
+    _processedMessageIds.clear();
   }
 } 

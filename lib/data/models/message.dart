@@ -11,7 +11,7 @@ class Message {
   final int id;
   final String senderId;
   final String? receiverId; // For 1v1 chat
-  final String? groupId;    // For group chat
+  final dynamic groupId;    // For group chat
   final String content;
   final DateTime sentAt;
   final bool isRead;
@@ -40,7 +40,7 @@ class Message {
     int? id,
     String? senderId,
     String? receiverId,
-    String? groupId,
+    dynamic groupId,
     String? content,
     DateTime? sentAt,
     bool? isRead,
@@ -67,6 +67,12 @@ class Message {
   }
 
   factory Message.fromJson(Map<String, dynamic> json) {
+    // Process the groupId which might be int from server but string in app
+    dynamic processedGroupId;
+    if (json.containsKey('groupId')) {
+      processedGroupId = json['groupId']; // Keep original type (int or String)
+    }
+
     // Xử lý trường id
     int messageId = 0;
     if (json.containsKey('id')) {
@@ -98,7 +104,6 @@ class Message {
     // Xử lý các trường khác
     String senderId = json['senderId'] ?? json['SenderId'] ?? '';
     String? receiverId = json['receiverId'] ?? json['ReceiverId'];
-    String? groupId = json['groupId'] ?? json['GroupId'];
     String content = json['content'] ?? json['Content'] ?? '';
     bool isRead = json['isRead'] ?? json['IsRead'] ?? false;
     
@@ -144,7 +149,7 @@ class Message {
       id: messageId,
       senderId: senderId,
       receiverId: receiverId,
-      groupId: groupId,
+      groupId: processedGroupId,
       content: content,
       sentAt: messageSentAt,
       isRead: isRead,

@@ -30,11 +30,40 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreen
   String _imageCaption = '';
   bool _showImagePreview = false;
   
+  // Biến để theo dõi thời gian gửi ảnh gần đây nhất
+  DateTime _lastImageSentTime = DateTime(2000); // Mặc định là thời gian xa
+  final Duration _minimumImageSendInterval = Duration(seconds: 2);
+  
   @override
   void initState() {
     super.initState();
     loadMessages(() => context.read<GroupChatCubit>().loadMessages());
     setupMessageStream(context.read<GroupChatCubit>().stream);
+    
+    // Đặt lắng nghe sự kiện focus thay đổi
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusManager.instance.primaryFocus?.addListener(_onFocusChange);
+    });
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.primaryFocus?.removeListener(_onFocusChange);
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    final hasFocus = FocusManager.instance.primaryFocus?.hasFocus ?? false;
+    if (hasFocus) {
+      // Màn hình được focus lại, refresh tin nhắn để loại bỏ trùng lặp
+      print('Screen refocused, refreshing messages');
+      refreshMessages();
+    }
+  }
+
+  void refreshMessages() {
+    // Gọi phương thức resetAndReloadMessages của cubit để tải lại tin nhắn
+    context.read<GroupChatCubit>().resetAndReloadMessages();
   }
 
   void _retryImageUpload(Message message) {
@@ -104,9 +133,32 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreen
   Future<void> _sendImage() async {
     if (_selectedImage == null) return;
     
+    // Kiểm tra thời gian gửi ảnh gần đây nhất
+    final now = DateTime.now();
+    final timeSinceLastSend = now.difference(_lastImageSentTime);
+    
+    if (timeSinceLastSend < _minimumImageSendInterval) {
+      // Hiện thông báo đang chờ
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đang chờ gửi ảnh...'),
+          duration: _minimumImageSendInterval - timeSinceLastSend,
+        ),
+      );
+      
+      // Chờ đủ thời gian tối thiểu
+      await Future.delayed(_minimumImageSendInterval - timeSinceLastSend);
+    }
+    
+    // Cập nhật thời gian gửi ảnh gần đây nhất
+    _lastImageSentTime = DateTime.now();
+    
     try {
       final cubit = context.read<GroupChatCubit>();
-      await cubit.sendImageMessage(_imageCaption, _selectedImage!);
+      await cubit.sendImageMessage(
+        _selectedImage!,
+        caption: _imageCaption,
+      );
       
       // Clear the image preview after sending
       setState(() {
