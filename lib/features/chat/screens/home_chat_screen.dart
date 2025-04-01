@@ -207,14 +207,10 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          if (_tabController.index == 0) {
-            // Show new chat dialog
-          } else {
-            showDialog(
-              context: context,
-              builder: (context) => const CreateGroupForm(),
-            );
-          }
+          showDialog(
+            context: context,
+            builder: (context) => const CreateGroupForm(),
+          );
         },
         child: const Icon(Icons.add),
       ),

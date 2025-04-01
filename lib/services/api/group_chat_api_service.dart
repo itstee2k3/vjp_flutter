@@ -239,39 +239,22 @@ class GroupChatApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getGroupMessages(int groupId, {int page = 1, int pageSize = 20}) async {
+  Future<List<Message>> getGroupMessages(int groupId, {int page = 1, int pageSize = 20}) async {
     try {
-      final url = '/api/group/messages/$groupId';
-      print('Fetching group messages: $url with page=$page, pageSize=$pageSize');
-      
-      final response = await _dio.get(
-        url,
-        queryParameters: {'page': page, 'pageSize': pageSize},
-        options: Options(headers: _headers),
+      final response = await http.get(
+        Uri.parse("$baseUrl/api/group/messages/$groupId?page=$page&pageSize=$pageSize"),
+        headers: _headers,
       );
-      
-      if (response.statusCode != 200) {
-        throw Exception('Failed to get group messages: HTTP ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> messagesJson = jsonDecode(response.body);
+        return messagesJson.map((json) => Message.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load group messages: ${response.statusCode}');
       }
-      
-      // Extract messages and pagination info from response
-      final data = response.data as Map<String, dynamic>;
-      final List<Message> messages = [];
-      
-      if (data.containsKey('messages') && data['messages'] is List) {
-        messages.addAll((data['messages'] as List).map((json) => Message.fromJson(json)).toList());
-      }
-      
-      return {
-        'messages': messages,
-        'total': data['total'] ?? 0,
-        'page': data['page'] ?? page,
-        'pageSize': data['pageSize'] ?? pageSize,
-        'hasMore': data['hasMore'] ?? false,
-      };
     } catch (e) {
-      print('Error fetching group messages: $e');
-      throw Exception('Failed to get group messages: $e');
+      print('Error in getGroupMessages: $e');
+      rethrow;
     }
   }
 

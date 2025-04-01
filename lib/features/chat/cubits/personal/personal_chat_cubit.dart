@@ -213,13 +213,6 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     }
   }
 
-  @override
-  Future<void> close() {
-    _messageSubscription.cancel();
-    _processedMessageIds.clear();
-    return super.close();
-  }
-
   ChatApiService get chatService => _chatService;
 
   Future<void> loadMessages() async {
@@ -263,6 +256,7 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
 
       final nextPage = state.currentPage + 1;
       print('Fetching messages for page: $nextPage');
+
       final newMessages = await _chatService.getChatHistory(receiverId, page: nextPage);
       print('Fetched ${newMessages.length} older messages');
 
@@ -311,11 +305,6 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     }
   }
 
-  void resetAndReloadMessages() {
-    _processedMessageIds.clear();
-    emit(PersonalChatState());
-    loadMessages();
-  }
 
   // Phương thức mới để loại bỏ các tin nhắn ảnh trùng lặp
   List<Message> _deduplicateImageMessages(List<Message> messages) {
@@ -491,5 +480,18 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     } catch (e) {
       print('Error sending typing status: $e');
     }
+  }
+
+  void resetAndReloadMessages() {
+    _processedMessageIds.clear();
+    emit(PersonalChatState());
+    loadMessages();
+  }
+
+  @override
+  Future<void> close() {
+    _messageSubscription.cancel();
+    _processedMessageIds.clear();
+    return super.close();
   }
 } 

@@ -49,7 +49,8 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> with Chat
       body: BlocBuilder<PersonalChatCubit, PersonalChatState>(
         builder: (context, state) {
           if (state.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+                child: CircularProgressIndicator());
           }
 
           return Column(

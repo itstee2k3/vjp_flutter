@@ -71,11 +71,11 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
 
   bool _checkIfNearBottom() {
     if (!widget.scrollController.hasClients) return true;
-    
+
     final position = widget.scrollController.position;
     final maxScroll = position.maxScrollExtent;
     final currentScroll = position.pixels;
-    
+
     return currentScroll >= maxScroll - 150;
   }
 
@@ -91,7 +91,7 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
         final overscrollAmount = position.minScrollExtent - position.pixels;
         final progress = (overscrollAmount / _overscrollThreshold).clamp(0.0, 1.0);
         print('Overscroll update: amount=$overscrollAmount, progress=$progress, threshold=$_overscrollThreshold');
-        
+
         setState(() {
           _isOverscrolling = true;
           _overscrollProgress = progress;
@@ -109,11 +109,11 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
       }
     } else if (notification is ScrollEndNotification) {
       print('Scroll end: shouldLoadMore=$_shouldLoadMore, hasMoreMessages=${widget.hasMoreMessages}, isLoadingMore=${widget.isLoadingMore}');
-      
+
       if (_shouldLoadMore && widget.hasMoreMessages && !widget.isLoadingMore) {
         print('Triggering load more messages...');
         widget.onLoadMore?.call();
-        
+
         // Keep _shouldLoadMore true until loading completes
         setState(() {
           _isOverscrolling = false;
@@ -121,7 +121,7 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
         });
       } else {
         print('Not loading more: shouldLoadMore=$_shouldLoadMore, hasMoreMessages=${widget.hasMoreMessages}, isLoadingMore=${widget.isLoadingMore}');
-        
+
         setState(() {
           _isOverscrolling = false;
           _overscrollProgress = 0.0;
@@ -148,13 +148,13 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
     }
 
     // Xử lý tin nhắn mới
-    if (widget.messages.length > _previousMessageCount && 
-        (oldWidget.messages.isEmpty || 
+    if (widget.messages.length > _previousMessageCount &&
+        (oldWidget.messages.isEmpty ||
          (oldWidget.messages.isNotEmpty && widget.messages.last.id != oldWidget.messages.last.id))) {
       final newMessagesCount = widget.messages.length - _previousMessageCount;
       print('New messages added: $newMessagesCount');
       print('Is near bottom: $_isNearBottom');
-      
+
       // Chỉ tự động cuộn xuống nếu đang ở gần cuối
       if (_isNearBottom) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -183,26 +183,26 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
           }
         });
       }
-    } 
+    }
     // Xử lý tin nhắn cũ (load more)
-    else if (widget.messages.length > oldWidget.messages.length && 
-        (oldWidget.messages.isEmpty || 
+    else if (widget.messages.length > oldWidget.messages.length &&
+        (oldWidget.messages.isEmpty ||
          (oldWidget.messages.isNotEmpty && widget.messages.first.id != oldWidget.messages.first.id))) {
       final newMessagesCount = widget.messages.length - oldWidget.messages.length;
       print('Old messages loaded: $newMessagesCount');
-      
+
       // Make sure we have both a scroll controller and that it has attached to clients
       if (!widget.scrollController.hasClients) {
         print('ScrollController has no clients, skipping position adjustment');
         return;
       }
-      
+
       // Store scroll metrics before layout changes
       final oldScrollPosition = widget.scrollController.position.pixels;
       final oldMaxExtent = widget.scrollController.position.maxScrollExtent;
-      
+
       // We'll measure the content height difference in a post-frame callback
-      
+
       // Thêm animations cho tin nhắn cũ
       for (int i = 0; i < newMessagesCount; i++) {
         _messageAnimations.insert(0, 0.0);
@@ -222,21 +222,47 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
       // Maintain scroll position after loading older messages - in two steps
       // First jump immediately to avoid flicker
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!widget.scrollController.hasClients) return;
-        
+        if (!widget.scrollController.hasClients) {
+          print('ScrollController has no clients, skipping position adjustment');
+          return;
+        }
+
         try {
           // Get the new max extent after layout
           final newMaxExtent = widget.scrollController.position.maxScrollExtent;
           // The difference in content height is what we need to adjust by
           final contentHeightDifference = newMaxExtent - oldMaxExtent;
-          
+
           print('Content metrics: oldPosition=$oldScrollPosition, oldMaxExtent=$oldMaxExtent, newMaxExtent=$newMaxExtent');
           print('Content height difference: $contentHeightDifference');
-          
+
           if (contentHeightDifference > 0) {
-            // Jump to the new position that factors in the added content
+            // Jump to the new position immediately to prevent flickering
             widget.scrollController.jumpTo(oldScrollPosition + contentHeightDifference);
-            print('Adjusted scroll position to: ${widget.scrollController.position.pixels}');
+            print('Adjusted scroll position to: ${oldScrollPosition + contentHeightDifference}');
+            
+            // Schedule another adjustment with a slight delay for greater accuracy
+            Future.delayed(const Duration(milliseconds: 50), () {
+              if (!mounted || !widget.scrollController.hasClients) return;
+              
+              try {
+                final finalMaxExtent = widget.scrollController.position.maxScrollExtent;
+                final finalContentDifference = finalMaxExtent - oldMaxExtent;
+                
+                if ((finalContentDifference - contentHeightDifference).abs() > 1.0) {
+                  // If there's still a significant difference after the initial jump,
+                  // do a second adjustment with animation for smoother experience
+                  widget.scrollController.animateTo(
+                    oldScrollPosition + finalContentDifference,
+                    duration: const Duration(milliseconds: 100),
+                    curve: Curves.easeOut,
+                  );
+                  print('Fine-tuned adjustment to: ${oldScrollPosition + finalContentDifference}');
+                }
+              } catch (e) {
+                print('Error during fine-tuned adjustment: $e');
+              }
+            });
           } else {
             print('No content height difference detected, using original position');
           }
