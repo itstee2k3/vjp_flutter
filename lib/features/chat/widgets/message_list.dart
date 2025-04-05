@@ -203,24 +203,27 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
 
       // We'll measure the content height difference in a post-frame callback
 
-      // Thêm animations cho tin nhắn cũ
+      // Thêm animations cho tin nhắn cũ - Initialize with opacity 1.0 directly
       for (int i = 0; i < newMessagesCount; i++) {
-        _messageAnimations.insert(0, 0.0);
+        _messageAnimations.insert(0, 1.0); // Set opacity to 1 immediately for old messages
       }
+      
+      // Estimate added height based on message type for better accuracy with images
+      double calculatedEstimatedHeightDifference = 0;
+      const double textHeightEstimate = 60.0; // Adjust based on your text bubble height + padding
+      const double imageHeightEstimate = 250.0; // Adjust based on typical image bubble height + padding
 
-      // Animate tin nhắn cũ
       for (int i = 0; i < newMessagesCount; i++) {
-        Future.delayed(Duration(milliseconds: 50 * i), () {
-          if (mounted) {
-            setState(() {
-              _messageAnimations[i] = 1.0;
-            });
-          }
-        });
+        final message = widget.messages[i];
+        if (message.type == MessageType.image) {
+          calculatedEstimatedHeightDifference += imageHeightEstimate;
+        } else { // Assuming other types (like text) use textHeightEstimate
+          calculatedEstimatedHeightDifference += textHeightEstimate;
+        }
       }
+      print('Calculated estimated height difference: $calculatedEstimatedHeightDifference for $newMessagesCount items');
 
-      // Maintain scroll position after loading older messages - in two steps
-      // First jump immediately to avoid flicker
+      // Maintain scroll position after loading older messages 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!widget.scrollController.hasClients) {
           print('ScrollController has no clients, skipping position adjustment');
@@ -228,46 +231,20 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
         }
 
         try {
-          // Get the new max extent after layout
-          final newMaxExtent = widget.scrollController.position.maxScrollExtent;
-          // The difference in content height is what we need to adjust by
-          final contentHeightDifference = newMaxExtent - oldMaxExtent;
-
-          print('Content metrics: oldPosition=$oldScrollPosition, oldMaxExtent=$oldMaxExtent, newMaxExtent=$newMaxExtent');
-          print('Content height difference: $contentHeightDifference');
-
-          if (contentHeightDifference > 0) {
-            // Jump to the new position immediately to prevent flickering
-            widget.scrollController.jumpTo(oldScrollPosition + contentHeightDifference);
-            print('Adjusted scroll position to: ${oldScrollPosition + contentHeightDifference}');
-            
-            // Schedule another adjustment with a slight delay for greater accuracy
-            Future.delayed(const Duration(milliseconds: 50), () {
-              if (!mounted || !widget.scrollController.hasClients) return;
-              
-              try {
-                final finalMaxExtent = widget.scrollController.position.maxScrollExtent;
-                final finalContentDifference = finalMaxExtent - oldMaxExtent;
-                
-                if ((finalContentDifference - contentHeightDifference).abs() > 1.0) {
-                  // If there's still a significant difference after the initial jump,
-                  // do a second adjustment with animation for smoother experience
-                  widget.scrollController.animateTo(
-                    oldScrollPosition + finalContentDifference,
-                    duration: const Duration(milliseconds: 100),
-                    curve: Curves.easeOut,
-                  );
-                  print('Fine-tuned adjustment to: ${oldScrollPosition + finalContentDifference}');
-                }
-              } catch (e) {
-                print('Error during fine-tuned adjustment: $e');
-              }
-            });
+          // Jump based on the calculated estimated height difference
+          if (calculatedEstimatedHeightDifference > 0) {
+            final targetPosition = oldScrollPosition + calculatedEstimatedHeightDifference;
+            widget.scrollController.jumpTo(targetPosition);
+            print('Adjusted scroll position based on calculated estimate to: $targetPosition');
           } else {
-            print('No content height difference detected, using original position');
+             print('No calculated estimated height difference, keeping original position: $oldScrollPosition');
+             if (widget.scrollController.position.pixels != oldScrollPosition) {
+                 widget.scrollController.jumpTo(oldScrollPosition);
+             }
           }
+          
         } catch (e) {
-          print('Error adjusting scroll position: $e');
+          print('Error adjusting scroll position based on calculated estimate: $e');
         }
       });
     }
