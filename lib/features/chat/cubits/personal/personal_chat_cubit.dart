@@ -213,13 +213,6 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     }
   }
 
-  @override
-  Future<void> close() {
-    _messageSubscription.cancel();
-    _processedMessageIds.clear();
-    return super.close();
-  }
-
   ChatApiService get chatService => _chatService;
 
   Future<void> loadMessages() async {
@@ -237,9 +230,14 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
         _processedMessageIds.add(messageId);
       }
 
+      // Kiểm tra xem còn tin nhắn để load thêm không
+      final hasMore = messages.length >= 20; // Giả sử mỗi trang có 20 tin nhắn
+
       emit(state.copyWith(
         messages: messages,
         isLoading: false,
+        currentPage: 1,
+        hasMoreMessages: hasMore,
       ));
     } catch (e) {
       emit(state.copyWith(
@@ -249,44 +247,97 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     }
   }
 
-  void resetAndReloadMessages() {
-    _processedMessageIds.clear();
-    emit(PersonalChatState());
-    loadMessages();
+  Future<void> loadMoreMessages() async {
+    if (!state.hasMoreMessages || state.isLoadingMore) return;
+
+    try {
+      print('Loading more messages, current page: ${state.currentPage}');
+      emit(state.copyWith(isLoadingMore: true, error: null));
+
+      final nextPage = state.currentPage + 1;
+      print('Fetching messages for page: $nextPage');
+
+      final newMessages = await _chatService.getChatHistory(receiverId, page: nextPage);
+      print('Fetched ${newMessages.length} older messages');
+
+      if (newMessages.isEmpty) {
+        print('No more messages to load');
+        emit(state.copyWith(
+          isLoadingMore: false,
+          hasMoreMessages: false,
+        ));
+        return;
+      }
+
+      // Sắp xếp tin nhắn mới theo thời gian
+      newMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+
+      // Thêm ID tin nhắn mới vào danh sách đã xử lý
+      for (var message in newMessages) {
+        final messageId = '${message.id}-${message.senderId}-${message.content}-${message.sentAt.millisecondsSinceEpoch}';
+        _processedMessageIds.add(messageId);
+      }
+
+      // Kết hợp tin nhắn cũ vào đầu danh sách hiện tại
+      final updatedMessages = [...newMessages, ...state.messages];
+      
+      // Sắp xếp lại toàn bộ danh sách tin nhắn theo thời gian
+      updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      
+      print('Updated message list now has ${updatedMessages.length} messages');
+      
+      // Kiểm tra xem còn tin nhắn để load thêm không
+      final hasMore = newMessages.length >= 20; // Giả sử mỗi trang có 20 tin nhắn
+      print('Has more messages: $hasMore');
+
+      emit(state.copyWith(
+        messages: updatedMessages,
+        isLoadingMore: false,
+        currentPage: nextPage,
+        hasMoreMessages: hasMore,
+      ));
+    } catch (e) {
+      print('Error loading more messages: $e');
+      emit(state.copyWith(
+        isLoadingMore: false,
+        error: e.toString(),
+      ));
+    }
   }
+
 
   // Phương thức mới để loại bỏ các tin nhắn ảnh trùng lặp
   List<Message> _deduplicateImageMessages(List<Message> messages) {
     // Sắp xếp tin nhắn theo thời gian trước
     final sortedMessages = List<Message>.from(messages)
       ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
-    
+
     final result = <Message>[];
     final processedImageIds = <String>{};
-    
+
     // Xử lý từng tin nhắn theo thứ tự thời gian
     for (final message in sortedMessages) {
       // Tạo ID duy nhất cho tin nhắn ảnh dựa trên URL và ID tin nhắn
-      final messageUniqueKey = message.type == MessageType.image 
+      final messageUniqueKey = message.type == MessageType.image
           ? '${message.id}_${message.imageUrl ?? "null"}'
           : message.id.toString();
-      
+
       // Nếu là tin nhắn ảnh có URL đã xử lý, bỏ qua
-      if (message.type == MessageType.image && 
-          message.imageUrl != null && 
+      if (message.type == MessageType.image &&
+          message.imageUrl != null &&
           processedImageIds.contains(messageUniqueKey)) {
         print('Skipping duplicate image message: $messageUniqueKey');
         continue;
       }
-      
+
       // Đánh dấu đã xử lý và thêm vào kết quả
       if (message.type == MessageType.image && message.imageUrl != null) {
         processedImageIds.add(messageUniqueKey);
       }
-      
+
       result.add(message);
     }
-    
+
     // Sắp xếp lại kết quả theo thời gian để đảm bảo thứ tự đúng
     result.sort((a, b) => a.sentAt.compareTo(b.sentAt));
     return result;
@@ -392,17 +443,6 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     }
   }
 
-  // Phương thức hiển thị dialog chọn nguồn hình ảnh
-  Future<ImageSource?> _showImageSourceDialog() async {
-    // Phương thức này cần được triển khai để hiển thị dialog chọn nguồn hình ảnh
-    // Nhưng hiện tại nó đang trả về null, nên cần cập nhật
-
-    // Bạn có thể sử dụng BuildContext để hiển thị dialog, nhưng điều này không khả thi trong Cubit
-    // Thay vào đó, bạn có thể sử dụng một callback hoặc một stream để thông báo cho UI hiển thị dialog
-
-    // Tạm thời, bạn có thể hardcode một giá trị để test:
-    return ImageSource.gallery;
-  }
 
   Future<void> sendImageFromSource(ImageSource source) async {
     try {
@@ -440,5 +480,18 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     } catch (e) {
       print('Error sending typing status: $e');
     }
+  }
+
+  void resetAndReloadMessages() {
+    _processedMessageIds.clear();
+    emit(PersonalChatState());
+    loadMessages();
+  }
+
+  @override
+  Future<void> close() {
+    _messageSubscription.cancel();
+    _processedMessageIds.clear();
+    return super.close();
   }
 } 

@@ -1,20 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../data/models/group_chat.dart';
 import '../../../../data/models/message.dart';
 import '../../cubits/group/group_chat_list_cubit.dart';
 import '../../cubits/group/group_chat_list_state.dart';
-import '../../widgets/create_group_form.dart';
 
 class GroupListScreen extends StatelessWidget {
   const GroupListScreen({Key? key}) : super(key: key);
-
-  void _showCreateGroupDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const CreateGroupForm(),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +35,7 @@ class GroupListScreen extends StatelessWidget {
               leading: CircleAvatar(
                 backgroundImage: group.avatarUrl != null && group.avatarUrl!.isNotEmpty
                     ? NetworkImage(group.avatarUrl!)
-                    : AssetImage("assets/avatar_default/avatar_default.png") as ImageProvider,
+                    : AssetImage("assets/avatar_default/avatar_group_default.png") as ImageProvider,
               ),
               title: Text(
                 group.name,
@@ -83,14 +76,7 @@ class GroupListScreen extends StatelessWidget {
                   )
                 : null,
               onTap: () {
-                Navigator.pushNamed(
-                  context,
-                  '/group-message',
-                  arguments: {
-                    'groupName': group.name,
-                    'groupId': group.id,
-                  },
-                );
+                context.push('/chat/group/${group.id}?groupName=${Uri.encodeComponent(group.name)}');
               },
             );
           },
@@ -125,7 +111,7 @@ class GroupListScreen extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
     final messageDate = DateTime(time.year, time.month, time.day);
-    
+
     if (messageDate == today) {
       return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     } else if (messageDate == yesterday) {

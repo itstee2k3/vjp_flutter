@@ -8,6 +8,9 @@ class GroupChatState extends Equatable {
   final bool isTyping;
   final String? currentUserId;
   final bool isSending;
+  final int currentPage;
+  final bool hasMoreMessages;
+  final bool isLoadingMore;
 
   GroupChatState({
     this.messages = const [],
@@ -16,6 +19,9 @@ class GroupChatState extends Equatable {
     this.isTyping = false,
     this.currentUserId,
     this.isSending = false,
+    this.currentPage = 1,
+    this.hasMoreMessages = true,
+    this.isLoadingMore = false,
   });
 
   GroupChatState copyWith({
@@ -25,6 +31,9 @@ class GroupChatState extends Equatable {
     bool? isTyping,
     String? currentUserId,
     bool? isSending,
+    int? currentPage,
+    bool? hasMoreMessages,
+    bool? isLoadingMore,
   }) {
     return GroupChatState(
       messages: messages ?? this.messages,
@@ -33,9 +42,22 @@ class GroupChatState extends Equatable {
       isTyping: isTyping ?? this.isTyping,
       currentUserId: currentUserId ?? this.currentUserId,
       isSending: isSending ?? this.isSending,
+      currentPage: currentPage ?? this.currentPage,
+      hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 
   @override
-  List<Object?> get props => [messages, isLoading, error, isTyping, currentUserId, isSending];
+  List<Object?> get props => [
+    messages, 
+    isLoading, 
+    error, 
+    isTyping, 
+    currentUserId, 
+    isSending,
+    currentPage,
+    hasMoreMessages,
+    isLoadingMore,
+  ];
 }

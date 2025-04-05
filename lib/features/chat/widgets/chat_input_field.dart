@@ -43,7 +43,7 @@ class ChatInputField extends StatelessWidget {
             onPressed: isLoading ? null : onImageSend,
           ),
           IconButton(
-            icon: isLoading 
+            icon: isLoading
                 ? SizedBox(
                     width: 24,
                     height: 24,

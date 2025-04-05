@@ -6,6 +6,9 @@ class PersonalChatState {
   final String? error;
   final bool isSending;
   final Map<String, bool> typingStatus;
+  final int currentPage;
+  final bool hasMoreMessages;
+  final bool isLoadingMore;
 
   PersonalChatState({
     this.messages = const [],
@@ -13,6 +16,9 @@ class PersonalChatState {
     this.error,
     this.isSending = false,
     this.typingStatus = const {},
+    this.currentPage = 1,
+    this.hasMoreMessages = true,
+    this.isLoadingMore = false,
   });
 
   PersonalChatState copyWith({
@@ -21,6 +27,9 @@ class PersonalChatState {
     String? error,
     bool? isSending,
     Map<String, bool>? typingStatus,
+    int? currentPage,
+    bool? hasMoreMessages,
+    bool? isLoadingMore,
   }) {
     return PersonalChatState(
       messages: messages ?? this.messages,
@@ -28,6 +37,9 @@ class PersonalChatState {
       error: error,
       isSending: isSending ?? this.isSending,
       typingStatus: typingStatus ?? this.typingStatus,
+      currentPage: currentPage ?? this.currentPage,
+      hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     );
   }
 }
