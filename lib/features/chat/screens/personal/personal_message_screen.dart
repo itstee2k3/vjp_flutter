@@ -57,6 +57,7 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> with Chat
             children: [
               Expanded(
                 child: MessageList(
+                  // isGroupChat: false,
                   messages: state.messages,
                   currentUserId: context.read<PersonalChatCubit>().chatService.currentUserId ?? '',
                   scrollController: scrollController,

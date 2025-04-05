@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class MessageTime extends StatelessWidget {
   final DateTime time;
@@ -12,15 +13,21 @@ class MessageTime extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    final formattedTime = '$hour:$minute';
+    final timeFormatter = DateFormat('HH:mm');
+    final formattedTime = timeFormatter.format(time);
+
+    final dateFormatter = DateFormat('dd/MM');
+    final formattedDate = dateFormatter.format(time);
+
+    final fullTimestamp = '$formattedTime $formattedDate';
 
     return Text(
-      formattedTime,
+      fullTimestamp,
       style: TextStyle(
         fontSize: 12,
-        color: isMe ? Colors.white70 : Colors.black54,
+        color: isMe
+            ? (Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54)
+            : Colors.grey[600],
       ),
     );
   }

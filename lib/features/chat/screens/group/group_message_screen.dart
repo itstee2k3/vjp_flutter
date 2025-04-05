@@ -62,6 +62,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreen
               children: [
                 Expanded(
                   child: MessageList(
+                    isGroupChat: true,
                     key: const ValueKey('group_message_list'),
                     messages: state.messages,
                     currentUserId: context.read<GroupChatCubit>().apiService.currentUserId ?? '',
@@ -70,6 +71,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreen
                     hasMoreMessages: state.hasMoreMessages,
                     isLoadingMore: state.isLoadingMore,
                     onLoadMore: () => context.read<GroupChatCubit>().loadMoreMessages(),
+                    getUserInfo: (userId) => context.read<GroupChatCubit>().getUserInfo(userId),
                   ),
                 ),
                 ChatInputField(

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../data/models/message.dart';
 import 'image_message_bubble.dart';
 import 'text_message_bubble.dart';
+import 'message_time.dart';
+
+// Define BubblePosition enum
+enum BubblePosition { single, first, middle, last }
 
 class MessageList extends StatefulWidget {
   final List<Message> messages;
@@ -12,6 +16,8 @@ class MessageList extends StatefulWidget {
   final bool hasMoreMessages;
   final bool isLoadingMore;
   final VoidCallback? onLoadMore;
+  final bool isGroupChat;
+  final Function(String userId)? getUserInfo;
 
   const MessageList({
     Key? key,
@@ -23,6 +29,8 @@ class MessageList extends StatefulWidget {
     this.hasMoreMessages = false,
     this.isLoadingMore = false,
     this.onLoadMore,
+    this.isGroupChat = false,
+    this.getUserInfo,
   }) : super(key: key);
 
   @override
@@ -210,7 +218,7 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
       
       // Estimate added height based on message type for better accuracy with images
       double calculatedEstimatedHeightDifference = 0;
-      const double textHeightEstimate = 60.0; // Adjust based on your text bubble height + padding
+      const double textHeightEstimate = 50.0; // Adjust based on your text bubble height + padding
       const double imageHeightEstimate = 250.0; // Adjust based on typical image bubble height + padding
 
       for (int i = 0; i < newMessagesCount; i++) {
@@ -253,6 +261,17 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
     _previousMessageCount = widget.messages.length;
   }
 
+  // Helper function to check sender and time grouping
+  bool _areMessagesInSameGroup(Message? m1, Message? m2) {
+    if (m1 == null || m2 == null) return false;
+    return m1.senderId == m2.senderId &&
+        m1.sentAt.year == m2.sentAt.year &&
+        m1.sentAt.month == m2.sentAt.month &&
+        m1.sentAt.day == m2.sentAt.day &&
+        m1.sentAt.hour == m2.sentAt.hour &&
+        m1.sentAt.minute == m2.sentAt.minute;
+  }
+
   @override
   void dispose() {
     widget.scrollController.removeListener(_scrollListener);
@@ -284,23 +303,95 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
                 final message = widget.messages[index];
                 final isMe = message.senderId == widget.currentUserId;
 
+                // --- Grouping Logic --- 
+                final bool isFirstMessage = index == 0;
+                final bool isLastMessage = index == widget.messages.length - 1;
+
+                final Message? prevMessage = isFirstMessage ? null : widget.messages[index - 1];
+                final Message? nextMessage = isLastMessage ? null : widget.messages[index + 1];
+
+                // Use helper function for grouping check
+                final bool sameGroupAsPrevious = _areMessagesInSameGroup(prevMessage, message);
+                final bool sameGroupAsNext = _areMessagesInSameGroup(message, nextMessage);
+
+                BubblePosition bubblePosition;
+                if (sameGroupAsPrevious && sameGroupAsNext) {
+                  bubblePosition = BubblePosition.middle;
+                } else if (sameGroupAsPrevious && !sameGroupAsNext) {
+                  bubblePosition = BubblePosition.last;
+                } else if (!sameGroupAsPrevious && sameGroupAsNext) {
+                  bubblePosition = BubblePosition.first;
+                } else { // !sameGroupAsPrevious && !sameGroupAsNext
+                  bubblePosition = BubblePosition.single;
+                }
+                // --- End Grouping Logic ---
+
+                // Determine if the timestamp should be shown (only for last/single messages IN A GROUP)
+                bool showTimestamp = bubblePosition == BubblePosition.last || bubblePosition == BubblePosition.single;
+
+                // Override: always show timestamp for the absolute last message in the list,
+                // but ensure its bubble position reflects its potential group status accurately
+                if (isLastMessage) {
+                   showTimestamp = true;
+                   // Recalculate position just for the last item if needed
+                   if (sameGroupAsPrevious) {
+                       bubblePosition = BubblePosition.last;
+                   } else {
+                       bubblePosition = BubblePosition.single;
+                   }
+                }
+
+                // Determine spacing based on bubble position (should be correct now)
+                double topMargin = (bubblePosition == BubblePosition.first || bubblePosition == BubblePosition.single) ? 8.0 : 1.0;
+                double bottomMargin = showTimestamp ? 4.0 : 1.0; // Less space if timestamp isn't shown below, normal if it is
+                if (bubblePosition == BubblePosition.last || bubblePosition == BubblePosition.single){
+                  bottomMargin += 4.0; // Add extra space after last/single message before next group/timestamp
+                }
+
+                // Lấy thông tin người gửi nếu là chat nhóm và không phải người dùng hiện tại
+                Map<String, dynamic>? senderInfo;
+                if (widget.isGroupChat && !isMe && widget.getUserInfo != null) {
+                  senderInfo = widget.getUserInfo!(message.senderId);
+                }
+
+                // Wrap the bubble and potential timestamp in a Column
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: AnimatedOpacity(
-                    opacity: _messageAnimations[index],
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                    child: message.type == MessageType.image
-                        ? ImageMessageBubble(
-                            message: message,
-                            isMe: isMe,
-                            onRetry: widget.onRetryImage,
-                            onRetryWithMessage: widget.onRetryImageWithMessage,
-                          )
-                        : TextMessageBubble(
-                            message: message,
-                            isMe: isMe,
-                          ),
+                  child: Column(
+                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: topMargin), // Apply dynamic top margin
+                      AnimatedOpacity(
+                        opacity: _messageAnimations.length > index ? _messageAnimations[index] : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        child: message.type == MessageType.image
+                            ? ImageMessageBubble(
+                                message: message,
+                                isMe: isMe,
+                                onRetry: widget.onRetryImage,
+                                onRetryWithMessage: widget.onRetryImageWithMessage,
+                                bubblePosition: bubblePosition, // Pass bubble position
+                                showSenderInfo: widget.isGroupChat && !isMe, // Chỉ hiển thị thông tin người gửi trong chat nhóm
+                                senderInfo: senderInfo,
+                              )
+                            : TextMessageBubble(
+                                message: message,
+                                isMe: isMe,
+                                bubblePosition: bubblePosition, // Pass bubble position
+                                showSenderInfo: widget.isGroupChat && !isMe, // Chỉ hiển thị thông tin người gửi trong chat nhóm
+                                senderInfo: senderInfo,
+                              ),
+                      ),
+                      // Conditionally display MessageTime outside the bubble
+                      if (showTimestamp)
+                        Padding(
+                          padding: EdgeInsets.only(top: 4, bottom: bottomMargin - 4), // Adjust padding for timestamp
+                          child: MessageTime(time: message.sentAt, isMe: isMe),
+                        )
+                      else
+                         SizedBox(height: bottomMargin), // Apply bottom margin if no timestamp
+                    ],
                   ),
                 );
               },

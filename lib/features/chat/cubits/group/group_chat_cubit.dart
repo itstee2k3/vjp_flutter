@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../data/models/message.dart';
+import '../../../../data/models/user.dart';
 import '../../../../services/api/group_chat_api_service.dart';
 import 'group_chat_state.dart';
 
@@ -13,6 +14,9 @@ class GroupChatCubit extends Cubit<GroupChatState> {
   StreamSubscription? _messageSubscription;
   final Set<String> _processedMessageIds = {};
   File? _lastImageFile; // Thêm biến này để lưu file ảnh cuối cùng
+  
+  // Map lưu cache thông tin người dùng
+  final Map<String, Map<String, dynamic>> _userInfoCache = {};
 
   GroupChatCubit({
     required GroupChatApiService apiService,
@@ -21,9 +25,36 @@ class GroupChatCubit extends Cubit<GroupChatState> {
        super(GroupChatState(currentUserId: apiService.currentUserId)) {
     loadMessages();
     _setupMessageStream();
+    _loadGroupMembers();
   }
 
   GroupChatApiService get apiService => _apiService;
+  
+  // Phương thức tải thông tin thành viên nhóm
+  Future<void> _loadGroupMembers() async {
+    try {
+      // Tải danh sách thành viên nhóm
+      final members = await _apiService.getGroupMembers(groupId);
+      
+      // Lưu thông tin người dùng vào cache
+      for (var member in members) {
+        if (member.containsKey('id') && member.containsKey('fullName')) {
+          final userId = member['id'].toString();
+          _userInfoCache[userId] = {
+            'fullName': member['fullName'],
+            'avatarUrl': member['avatarUrl'],
+          };
+        }
+      }
+    } catch (e) {
+      print('Error loading group members: $e');
+    }
+  }
+  
+  // Phương thức lấy thông tin người dùng từ ID
+  Map<String, dynamic>? getUserInfo(String userId) {
+    return _userInfoCache[userId];
+  }
 
   Future<void> loadMessages() async {
     try {

@@ -3,12 +3,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../data/models/message.dart';
 import '../../../core/config/api_config.dart';
 import 'message_time.dart';
+import 'message_list.dart';
 
 class ImageMessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
   final VoidCallback? onRetry;
   final Function(Message)? onRetryWithMessage;
+  final BubblePosition bubblePosition;
+  final bool showSenderInfo;
+  final Map<String, dynamic>? senderInfo; // Thông tin người gửi (fullName, avatarUrl)
 
   const ImageMessageBubble({
     Key? key,
@@ -16,6 +20,9 @@ class ImageMessageBubble extends StatelessWidget {
     required this.isMe,
     this.onRetry,
     this.onRetryWithMessage,
+    required this.bubblePosition,
+    this.showSenderInfo = false,
+    this.senderInfo,
   }) : super(key: key);
 
   // Helper method to call the appropriate retry callback
@@ -31,46 +38,111 @@ class ImageMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget imageContent;
 
+    const Radius messageRadius = Radius.circular(12);
+    const Radius sharpRadius = Radius.circular(4);
+
+    BorderRadius containerBorderRadius;
+    BorderRadius imageBorderRadius;
+
+    switch (bubblePosition) {
+      case BubblePosition.single:
+        containerBorderRadius = BorderRadius.all(messageRadius);
+        imageBorderRadius = BorderRadius.all(messageRadius - Radius.circular(4));
+        break;
+      case BubblePosition.first:
+        containerBorderRadius = isMe
+            ? const BorderRadius.only(topLeft: messageRadius, topRight: messageRadius, bottomLeft: messageRadius, bottomRight: sharpRadius)
+            : const BorderRadius.only(topLeft: messageRadius, topRight: messageRadius, bottomLeft: sharpRadius, bottomRight: messageRadius);
+        imageBorderRadius = isMe
+            ? const BorderRadius.only(topLeft: messageRadius, topRight: messageRadius, bottomLeft: messageRadius, bottomRight: Radius.zero)
+            : const BorderRadius.only(topLeft: messageRadius, topRight: messageRadius, bottomLeft: Radius.zero, bottomRight: messageRadius);
+        break;
+      case BubblePosition.middle:
+        containerBorderRadius = isMe
+            ? const BorderRadius.only(topLeft: messageRadius, topRight: sharpRadius, bottomLeft: messageRadius, bottomRight: sharpRadius)
+            : const BorderRadius.only(topLeft: sharpRadius, topRight: messageRadius, bottomLeft: sharpRadius, bottomRight: messageRadius);
+        imageBorderRadius = isMe
+            ? const BorderRadius.only(topLeft: messageRadius, topRight: Radius.zero, bottomLeft: messageRadius, bottomRight: Radius.zero)
+            : const BorderRadius.only(topLeft: Radius.zero, topRight: messageRadius, bottomLeft: Radius.zero, bottomRight: messageRadius);
+        break;
+      case BubblePosition.last:
+        containerBorderRadius = isMe
+            ? const BorderRadius.only(topLeft: messageRadius, topRight: sharpRadius, bottomLeft: messageRadius, bottomRight: messageRadius)
+            : const BorderRadius.only(topLeft: sharpRadius, topRight: messageRadius, bottomLeft: messageRadius, bottomRight: messageRadius);
+        imageBorderRadius = isMe
+            ? const BorderRadius.only(topLeft: messageRadius, topRight: Radius.zero, bottomLeft: messageRadius, bottomRight: messageRadius)
+            : const BorderRadius.only(topLeft: Radius.zero, topRight: messageRadius, bottomLeft: messageRadius, bottomRight: messageRadius);
+        break;
+    }
+
     if (message.isSending) {
-      imageContent = _buildSendingState();
+      imageContent = _buildSendingState(containerBorderRadius);
     } else if (message.isError) {
-      imageContent = _buildErrorState();
+      imageContent = _buildErrorState(containerBorderRadius);
     } else if (message.imageUrl != null) {
-      imageContent = _buildImageContent(context);
+      imageContent = _buildImageContent(context, imageBorderRadius);
     } else {
-      imageContent = _buildUnknownState();
+      imageContent = _buildUnknownState(containerBorderRadius);
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 0),
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: isMe ? Colors.blue : Colors.grey[200],
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              imageContent,
-              const SizedBox(height: 4),
-              MessageTime(time: message.sentAt, isMe: isMe),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            // Hiển thị tên người gửi ở chat nhóm khi showSenderInfo = true
+            if (showSenderInfo && senderInfo != null && (bubblePosition == BubblePosition.first || bubblePosition == BubblePosition.single))
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (senderInfo!['avatarUrl'] != null)
+                      CircleAvatar(
+                        radius: 10,
+                        backgroundImage: NetworkImage(senderInfo!['avatarUrl']),
+                      )
+                    else
+                      CircleAvatar(
+                        radius: 10,
+                        backgroundImage: AssetImage("assets/avatar_default/avatar_default.png") as ImageProvider,
+                      ),
+                    const SizedBox(width: 4),
+                    Text(
+                      senderInfo!['fullName'] ?? 'Unknown',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Ảnh tin nhắn
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: isMe ? Colors.blue : Colors.grey[200],
+                borderRadius: containerBorderRadius,
+              ),
+              child: imageContent,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSendingState() {
+  Widget _buildSendingState(BorderRadius borderRadius) {
     return Container(
       width: 200,
       height: 200,
       decoration: BoxDecoration(
         color: isMe ? Colors.blue.withOpacity(0.3) : Colors.grey[300],
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: borderRadius,
       ),
       child: Center(
         child: Column(
@@ -94,12 +166,12 @@ class ImageMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(BorderRadius borderRadius) {
     return Container(
       width: 200,
       decoration: BoxDecoration(
         color: Colors.red[100],
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: borderRadius,
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -131,7 +203,7 @@ class ImageMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildImageContent(BuildContext context) {
+  Widget _buildImageContent(BuildContext context, BorderRadius imageBorderRadius) {
     final uniqueKey = Key('image_${message.id}_${message.imageUrl}_${DateTime.now().millisecondsSinceEpoch}');
     final uniqueCacheKey = 'image_${message.id}_${message.imageUrl}';
 
@@ -141,7 +213,7 @@ class ImageMessageBubble extends StatelessWidget {
         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: imageBorderRadius,
             child: CachedNetworkImage(
               imageUrl: ApiConfig.getFullImageUrl(message.imageUrl),
               width: 200,
@@ -206,7 +278,7 @@ class ImageMessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildUnknownState() {
+  Widget _buildUnknownState(BorderRadius borderRadius) {
     return GestureDetector(
       onTap: _handleRetry,
       child: Container(
@@ -214,7 +286,7 @@ class ImageMessageBubble extends StatelessWidget {
         height: 100,
         decoration: BoxDecoration(
           color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: borderRadius,
         ),
         child: Center(
           child: Column(
