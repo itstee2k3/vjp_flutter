@@ -7,6 +7,8 @@ import 'package:signalr_netcore/signalr_client.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
+const int _pageSize = 20;
+
 class PersonalChatCubit extends Cubit<PersonalChatState> {
   final ChatApiService _chatService;
   final String receiverId;
@@ -219,19 +221,15 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
     try {
       emit(state.copyWith(isLoading: true, error: null));
 
-      final messages = await _chatService.getChatHistory(receiverId, page: 1);
-
-      // Sắp xếp tin nhắn theo thời gian tăng dần
-      messages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      final historyResponse = await _chatService.getChatHistory(receiverId, page: 1, pageSize: _pageSize);
+      final List<Message> messages = historyResponse['messages'] ?? [];
+      final bool hasMore = historyResponse['hasMore'] ?? false;
 
       // Thêm tất cả ID tin nhắn vào danh sách đã xử lý
       for (var message in messages) {
         final messageId = '${message.id}-${message.senderId}-${message.content}-${message.sentAt.millisecondsSinceEpoch}';
         _processedMessageIds.add(messageId);
       }
-
-      // Kiểm tra xem còn tin nhắn để load thêm không
-      final hasMore = messages.length >= 20; // Giả sử mỗi trang có 20 tin nhắn
 
       emit(state.copyWith(
         messages: messages,
@@ -257,10 +255,13 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
       final nextPage = state.currentPage + 1;
       print('Fetching messages for page: $nextPage');
 
-      final newMessages = await _chatService.getChatHistory(receiverId, page: nextPage);
+      final historyResponse = await _chatService.getChatHistory(receiverId, page: nextPage, pageSize: _pageSize);
+      final List<Message> newMessages = historyResponse['messages'] ?? [];
+      final bool hasMore = historyResponse['hasMore'] ?? false;
+
       print('Fetched ${newMessages.length} older messages');
 
-      if (newMessages.isEmpty) {
+      if (newMessages.isEmpty && !hasMore) {
         print('No more messages to load');
         emit(state.copyWith(
           isLoadingMore: false,
@@ -268,9 +269,15 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
         ));
         return;
       }
-
-      // Sắp xếp tin nhắn mới theo thời gian
-      newMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+      
+      if (newMessages.isEmpty && hasMore) {
+         print('API returned empty list but hasMore is true. Maybe a temporary issue? Stopping load more for now.');
+         emit(state.copyWith(
+           isLoadingMore: false, 
+           hasMoreMessages: true,
+         ));
+         return;
+      }
 
       // Thêm ID tin nhắn mới vào danh sách đã xử lý
       for (var message in newMessages) {
@@ -278,17 +285,13 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
         _processedMessageIds.add(messageId);
       }
 
-      // Kết hợp tin nhắn cũ vào đầu danh sách hiện tại
-      final updatedMessages = [...newMessages, ...state.messages];
-      
-      // Sắp xếp lại toàn bộ danh sách tin nhắn theo thời gian
-      updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
-      
-      print('Updated message list now has ${updatedMessages.length} messages');
-      
-      // Kiểm tra xem còn tin nhắn để load thêm không
-      final hasMore = newMessages.length >= 20; // Giả sử mỗi trang có 20 tin nhắn
       print('Has more messages: $hasMore');
+
+      final updatedMessages = [...newMessages, ...state.messages];
+
+      updatedMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
+
+      print('Updated message list now has ${updatedMessages.length} messages');
 
       emit(state.copyWith(
         messages: updatedMessages,
@@ -304,7 +307,6 @@ class PersonalChatCubit extends Cubit<PersonalChatState> {
       ));
     }
   }
-
 
   // Phương thức mới để loại bỏ các tin nhắn ảnh trùng lặp
   List<Message> _deduplicateImageMessages(List<Message> messages) {

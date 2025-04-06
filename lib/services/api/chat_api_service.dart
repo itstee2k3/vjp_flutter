@@ -326,7 +326,7 @@ class ChatApiService {
     }
   }
 
-  Future<List<Message>> getChatHistory(String userId, {int page = 1, int pageSize = 20}) async {
+  Future<Map<String, dynamic>> getChatHistory(String userId, {int page = 1, int pageSize = 20}) async {
     try {
       final response = await http.get(
         Uri.parse("$baseUrl$chatHistoryEndpoint/$userId?page=$page&pageSize=$pageSize"),
@@ -334,12 +334,24 @@ class ChatApiService {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => Message.fromJson(json)).toList();
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData.containsKey('data') && responseData['data'] is List && responseData.containsKey('hasMore')) {
+           final List<dynamic> messagesJson = responseData['data'];
+           final List<Message> messages = messagesJson.map((json) => Message.fromJson(json)).toList();
+           final bool hasMore = responseData['hasMore'] as bool;
+           
+           // Sắp xếp lại để đảm bảo tin nhắn cũ nhất ở đầu (API trả về mới nhất trước)
+           messages.sort((a, b) => a.sentAt.compareTo(b.sentAt)); 
+
+           return {'messages': messages, 'hasMore': hasMore};
+        } else {
+          throw Exception('Invalid API response format for chat history');
+        }
       } else {
-        throw Exception('Failed to load chat history');
+        throw Exception('Failed to load chat history: ${response.statusCode} ${response.reasonPhrase}');
       }
     } catch (e) {
+      print('Error getting chat history: $e'); // Log the error
       throw Exception('Error getting chat history: $e');
     }
   }
@@ -708,8 +720,8 @@ class ChatApiService {
       for (var user in users) {
         try {
           final chatHistory = await getChatHistory(user.id, page: 1, pageSize: 1); // Chỉ lấy 1 tin nhắn mới nhất
-          if (chatHistory.isNotEmpty) {
-            results[user.id] = chatHistory.first;
+          if (chatHistory['messages'] is List && chatHistory['messages'].isNotEmpty) {
+            results[user.id] = chatHistory['messages'].first;
           } else {
             results[user.id] = null;
           }
@@ -729,10 +741,12 @@ class ChatApiService {
   // Lấy tin nhắn mới nhất từ một người dùng cụ thể
   Future<Message?> getLatestMessage(String userId) async {
     try {
-      final chatHistory = await getChatHistory(userId, page: 1, pageSize: 1); // Chỉ lấy 1 tin nhắn mới nhất
-      if (chatHistory.isNotEmpty) {
-        return chatHistory.first;
-      }
+      final historyResponse = await getChatHistory(userId, page: 1, pageSize: 1);
+      final messages = historyResponse['messages'] as List<Message>;
+       if (messages.isNotEmpty) {
+         // API trả về DESC, nhưng ta đã sort ASC trong getChatHistory, nên lấy last
+         return messages.last; 
+       }
       return null;
     } catch (e) {
       print('Error getting latest message: $e');

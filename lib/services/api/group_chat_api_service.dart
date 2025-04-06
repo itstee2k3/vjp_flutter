@@ -64,30 +64,13 @@ class GroupChatApiService {
             messageId = '${messageJson['id']}-${messageJson['senderId']}-image-${shortenedUrl}';
           } else {
             // ID thông thường cho tin nhắn văn bản
-            messageId = '${messageJson['id']}-${messageJson['senderId']}-${messageJson['content']}';
+            messageId = '${messageJson['id']}-${messageJson['senderId']}-${messageJson['content']}-${messageJson['sentAt']?.toString()}'; // Include timestamp in text ID for more uniqueness
           }
           
-          // Kiểm tra tin nhắn đã xử lý chưa
+          // Kiểm tra tin nhắn đã xử lý chưa bằng ID chính xác hơn
           if (_processedMessageIds.contains(messageId)) {
-            print('Duplicate SignalR group message detected, ignoring: $messageId');
+            print('Duplicate SignalR group message detected by specific ID, ignoring: $messageId');
             return;
-          }
-          
-          // Thêm kiểm tra trùng lặp bổ sung cho hình ảnh
-          if (isImageMessage) {
-            // Kiểm tra xem có tin nhắn ảnh nào từ cùng người gửi trong 5 giây gần đây không
-            final sentAt = messageJson['sentAt'] != null 
-                ? DateTime.parse(messageJson['sentAt'].toString())
-                : DateTime.now();
-                
-            final similarImageKey = '${messageJson['senderId']}-image-${sentAt.millisecondsSinceEpoch ~/ 5000}';
-            if (_processedMessageIds.contains(similarImageKey)) {
-              print('Similar image message from same sender detected within time window, ignoring');
-              return;
-            }
-            
-            // Đánh dấu khoảng thời gian gửi ảnh này để tránh trùng lặp
-            _processedMessageIds.add(similarImageKey);
           }
           
           // Giới hạn kích thước của set
@@ -98,7 +81,7 @@ class GroupChatApiService {
             }
           }
           
-          // Đánh dấu tin nhắn đã xử lý
+          // Đánh dấu tin nhắn đã xử lý (using the specific ID)
           _processedMessageIds.add(messageId);
           
           // Log the raw message data and its groupId type
@@ -239,7 +222,7 @@ class GroupChatApiService {
     }
   }
 
-  Future<List<Message>> getGroupMessages(int groupId, {int page = 1, int pageSize = 20}) async {
+  Future<Map<String, dynamic>> getGroupMessages(int groupId, {int page = 1, int pageSize = 20}) async {
     try {
       final response = await http.get(
         Uri.parse("$baseUrl/api/group/messages/$groupId?page=$page&pageSize=$pageSize"),
@@ -247,8 +230,19 @@ class GroupChatApiService {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> messagesJson = jsonDecode(response.body);
-        return messagesJson.map((json) => Message.fromJson(json)).toList();
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData.containsKey('data') && responseData['data'] is List && responseData.containsKey('hasMore')) {
+          final List<dynamic> messagesJson = responseData['data'];
+          final List<Message> messages = messagesJson.map((json) => Message.fromJson(json)).toList();
+          final bool hasMore = responseData['hasMore'] as bool;
+          
+          // Sắp xếp lại để đảm bảo tin nhắn cũ nhất ở đầu (API trả về mới nhất trước)
+          messages.sort((a, b) => a.sentAt.compareTo(b.sentAt)); 
+          
+          return {'messages': messages, 'hasMore': hasMore};
+        } else {
+          throw Exception('Invalid API response format for group messages');
+        }
       } else {
         throw Exception('Failed to load group messages: ${response.statusCode}');
       }
@@ -391,20 +385,6 @@ class GroupChatApiService {
       
       final imageUrl = response.data['imageUrl'] as String;
       print('Image uploaded successfully: $imageUrl');
-      
-      // Sau khi upload thành công, tạo thêm các ID với khoảng thời gian khác nhau
-      // để tránh xử lý các tin nhắn trùng lặp trong thời gian ngắn
-      final now = DateTime.now();
-      // Thêm các ID phòng ngừa với khoảng thời gian từ hiện tại đến 3 giây sau
-      for (int i = 0; i <= 3; i++) {
-        final futureTime = now.add(Duration(seconds: i));
-        final timeBasedId = '$currentUserId-image-${futureTime.millisecondsSinceEpoch ~/ 1000}';
-        _processedMessageIds.add(timeBasedId);
-        
-        // Thêm cả ID với độ chính xác thấp hơn
-        final timeBasedId5s = '$currentUserId-image-${futureTime.millisecondsSinceEpoch ~/ 5000}';
-        _processedMessageIds.add(timeBasedId5s);
-      }
       
       return imageUrl;
     } catch (e) {
