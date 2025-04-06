@@ -10,27 +10,26 @@ class FAQSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.5),
-            blurRadius: 2,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: TextField(
-        onChanged: onSearch,
-        decoration: const InputDecoration(
-          hintText: 'Tìm kiếm câu hỏi...',
-          prefixIcon: Icon(Icons.search, color: Colors.blue),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return TextField(
+      onChanged: onSearch,
+      decoration: InputDecoration(
+        hintText: 'Tìm kiếm câu hỏi...',
+        hintStyle: TextStyle(color: Colors.grey.shade600),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide(color: Colors.grey.shade500, width: 1.0),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../data/models/faq.dart'; // Import FAQ model
-import '../../../data/sample_data/faqs_data.dart'; // Import sample data
+import '../../../data/models/faq.dart';
+import '../../../data/sample_data/faqs_data.dart';
 import '../widgets/faq_search_bar.dart';
 import '../widgets/faq_list.dart';
 
@@ -16,21 +16,21 @@ String _removeDiacritics(String str) {
   return str;
 }
 
-class FAQScreen extends StatefulWidget { // Chuyển thành StatefulWidget
+class FAQScreen extends StatefulWidget {
   const FAQScreen({Key? key}) : super(key: key);
 
   @override
   State<FAQScreen> createState() => _FAQScreenState();
 }
 
-class _FAQScreenState extends State<FAQScreen> { // Tạo State
+class _FAQScreenState extends State<FAQScreen> {
   String _searchQuery = '';
-  List<FAQ> _filteredFaqs = faqItems; // Khởi tạo với toàn bộ danh sách
+  List<FAQ> _filteredFaqs = faqItems;
 
   @override
   void initState() {
     super.initState();
-    _filteredFaqs = faqItems; // Đảm bảo danh sách được khởi tạo
+    _filteredFaqs = faqItems;
   }
 
   void _filterFaqs(String query) {
@@ -38,7 +38,7 @@ class _FAQScreenState extends State<FAQScreen> { // Tạo State
     setState(() {
       _searchQuery = query;
       if (query.isEmpty) {
-        _filteredFaqs = faqItems; // Nếu query rỗng, hiển thị tất cả
+        _filteredFaqs = faqItems;
       } else {
         _filteredFaqs = faqItems
             .where((faq) {
@@ -47,7 +47,7 @@ class _FAQScreenState extends State<FAQScreen> { // Tạo State
               return normalizedQuestion.contains(normalizedQuery) ||
                      normalizedAnswer.contains(normalizedQuery);
             })
-            .toList(); // Lọc theo câu hỏi hoặc câu trả lời
+            .toList();
       }
     });
   }
@@ -57,40 +57,30 @@ class _FAQScreenState extends State<FAQScreen> { // Tạo State
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          const SliverAppBar(
-            expandedHeight: 100.0, // Tăng chiều cao của SliverAppBar để có đủ không gian
-            pinned: true, // Giữ SliverAppBar luôn hiển thị khi cuộn
-            backgroundColor: Colors.white,
-            elevation: 0,
-            centerTitle: true, // Căn giữa tiêu đề trong SliverAppBar
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                'Các câu hỏi thường gặp trong kết nối - giao thương Việt Nam - Nhật Bản',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.blue,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center, // Căn giữa tiêu đề
-              ),
-              // titlePadding: EdgeInsets.symmetric(horizontal: 16.0), // Đảm bảo padding hợp lý cho tiêu đề
-            ),
-          ),
           SliverToBoxAdapter(
             child: Container(
               color: Colors.white,
-              padding: const EdgeInsets.only(left: 30, right: 30, top: 10, bottom: 10),
-              child: Column( // Bọc trong Column để thêm FAQSearchBar
+              padding: const EdgeInsets.only(left: 30, right: 30, top: 30, bottom: 10),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  const Text(
+                    'Các câu hỏi thường gặp trong kết nối - giao thương Việt Nam - Nhật Bản',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  FAQSearchBar(onSearch: _filterFaqs), // Truyền hàm callback
+                  FAQSearchBar(onSearch: _filterFaqs),
                 ],
               ),
             ),
           ),
           SliverFillRemaining(
-            child: FAQList(faqs: _filteredFaqs), // Truyền danh sách đã lọc
+            child: FAQList(faqs: _filteredFaqs),
           ),
         ],
       ),

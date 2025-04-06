@@ -30,34 +30,34 @@ class FAQList extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 2,
-                  // shadowColor: Colors.black26,
+                  shadowColor: Colors.black12,
                   child: Theme(
                     data: Theme.of(context).copyWith(
-                      dividerColor: Colors.transparent, // Ẩn đường gạch dưới nội dung mở rộng
+                      dividerColor: Colors.transparent,
                     ),
                     child: ExpansionTile(
-                      iconColor: Colors.blueAccent,
-                      collapsedIconColor: Colors.blueAccent,
+                      iconColor: Colors.black,
+                      collapsedIconColor: Colors.black,
                       title: Text(
                         faq.question,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: Colors.black,
                         ),
                       ),
                       subtitle: Text(
                         'Ngày tạo: ${DateFormat('dd/MM/yyyy').format(faq.createdAt)}',
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: Colors.black54,
                         ),
                       ),
                       children: [
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: Colors.grey[50],
                             borderRadius: const BorderRadius.vertical(
                               bottom: Radius.circular(16),
                             ),
@@ -67,7 +67,7 @@ class FAQList extends StatelessWidget {
                             faq.answer,
                             style: const TextStyle(
                               fontSize: 14,
-                              color: Colors.black87,
+                              color: Colors.black,
                               height: 1.5,
                             ),
                           ),
