@@ -13,13 +13,12 @@ class FAQSearchBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Colors.grey[100],
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.5),
-            spreadRadius: 2,
-            blurRadius: 5,
+            blurRadius: 2,
             offset: const Offset(0, 3),
           ),
         ],

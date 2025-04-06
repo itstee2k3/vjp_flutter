@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
               SliverToBoxAdapter(
                 child: Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(bottom: 16),
                   child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
