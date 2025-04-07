@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../features/auth/cubits/auth_cubit.dart';
 import '../../features/auth/cubits/auth_state.dart' as auth;
@@ -105,10 +106,7 @@ class TopNavigation extends StatelessWidget implements PreferredSizeWidget {
           _buildActionButton(
             title: "Đăng Nhập",
             color: Colors.red,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AuthScreen()),
-            ),
+            onPressed: () => context.push('/auth'),
           ),
       ],
     );

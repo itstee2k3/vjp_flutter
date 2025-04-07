@@ -1,70 +1,63 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../services/api/api_service.dart';
 import 'sign_up_state.dart';
-import 'sign_up_event.dart';
 import '../../../../core/validators/auth_validator.dart';
 
-class SignUpCubit extends Bloc<SignUpEvent, SignUpState> {
+class SignUpCubit extends Cubit<SignUpState> {
   final ApiService _apiService;
 
-  SignUpCubit(this._apiService) : super(const SignUpState()) {
-    on<SignUpFullNameChanged>(_onFullNameChanged);
-    on<SignUpEmailChanged>(_onEmailChanged);
-    on<SignUpPasswordChanged>(_onPasswordChanged);
-    on<SignUpConfirmPasswordChanged>(_onConfirmPasswordChanged);
-    on<SignUpSubmitted>(_onSubmitted);
-  }
+  SignUpCubit(this._apiService) : super(const SignUpState());
 
-  void _onFullNameChanged(SignUpFullNameChanged event, Emitter<SignUpState> emit) {
+  void onFullNameChanged(String fullName) {
     String fullNameError = '';
 
     // Kiểm tra độ dài
-    if (event.fullName.isEmpty) {
+    if (fullName.isEmpty) {
       fullNameError = 'Họ và tên không được để trống';
-    } else if (event.fullName.length < 2) {
+    } else if (fullName.length < 2) {
       fullNameError = 'Họ và tên phải có ít nhất 2 ký tự';
     }
 
     emit(state.copyWith(
-        fullName: event.fullName,
+        fullName: fullName,
         fullNameError: fullNameError
     ));
   }
 
-  void _onEmailChanged(SignUpEmailChanged event, Emitter<SignUpState> emit) {
-    final emailError = AuthValidator.validateEmail(event.email) ?? '';
+  void onEmailChanged(String email) {
+    final emailError = AuthValidator.validateEmail(email) ?? '';
     emit(state.copyWith(
-      email: event.email,
+      email: email,
       emailError: emailError
     ));
   }
 
-  void _onPasswordChanged(SignUpPasswordChanged event, Emitter<SignUpState> emit) {
-    final passwordError = AuthValidator.validatePassword(event.password) ?? '';
+  void onPasswordChanged(String password) {
+    final passwordError = AuthValidator.validatePassword(password) ?? '';
     emit(state.copyWith(
-      password: event.password,
+      password: password,
       passwordError: passwordError,
       // Kiểm tra lại xác nhận mật khẩu
       confirmPasswordError: AuthValidator.validateConfirmPassword(
-        event.password, 
+        password, 
         state.confirmPassword
       ) ?? '',
     ));
   }
 
-  void _onConfirmPasswordChanged(SignUpConfirmPasswordChanged event, Emitter<SignUpState> emit) {
+  void onConfirmPasswordChanged(String confirmPassword) {
     final confirmPasswordError = AuthValidator.validateConfirmPassword(
       state.password,
-      event.confirmPassword
+      confirmPassword
     ) ?? '';
     
     emit(state.copyWith(
-        confirmPassword: event.confirmPassword,
+        confirmPassword: confirmPassword,
         confirmPasswordError: confirmPasswordError
     ));
   }
 
-  void _onSubmitted(SignUpSubmitted event, Emitter<SignUpState> emit) async {
+  Future<void> signUp() async {
     emit(state.copyWith(isLoading: true));
 
     // Kiểm tra toàn bộ các trường một lần nữa trước khi submit
@@ -81,11 +74,8 @@ class SignUpCubit extends Bloc<SignUpEvent, SignUpState> {
     }
 
     String passwordError = state.password.isEmpty ? 'Mật khẩu không được để trống' : '';
-    String confirmPasswordError = state.confirmPassword.isEmpty ? 'Xác nhận mật khẩu không được để trống' : '';
-    // Kiểm tra mật khẩu và xác nhận mật khẩu có khớp không
-    if (state.password != state.confirmPassword) {
-      confirmPasswordError = 'Mật khẩu không khớp';
-    }
+    // Revalidate confirm password using AuthValidator
+    String confirmPasswordError = AuthValidator.validateConfirmPassword(state.password, state.confirmPassword) ?? '';
 
     // Nếu có lỗi thì không tiếp tục đăng ký
     if (fullNameError.isNotEmpty ||
@@ -131,25 +121,5 @@ class SignUpCubit extends Bloc<SignUpEvent, SignUpState> {
       emit(state.copyWith(isLoading: false, errorMessage: 'Có lỗi xảy ra, vui lòng thử lại!'));
       print('Error: $e');  // In lỗi để bạn có thể debug
     }
-  }
-
-  String _validateEmail(String email) {
-    return AuthValidator.validateEmail(email) ?? '';
-  }
-
-  String _validatePassword(String password) {
-    return AuthValidator.validatePassword(password) ?? '';
-  }
-
-  String _validateConfirmPassword(String confirmPassword) {
-    if (confirmPassword.trim().isEmpty) {
-      return "Xác nhận mật khẩu không được để trống!";
-    }
-    
-    if (confirmPassword != state.password) {
-      return "Mật khẩu xác nhận không khớp!";
-    }
-    
-    return '';
   }
 }

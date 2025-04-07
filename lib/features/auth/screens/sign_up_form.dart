@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../cubits/sign_up/sign_up_cubit.dart';
-import '../cubits/sign_up/sign_up_event.dart';
 import '../cubits/sign_up/sign_up_state.dart';
 
 class SignUpForm extends StatefulWidget {
@@ -81,21 +80,21 @@ class _SignUpFormState extends State<SignUpForm> {
               // Full Name field
               _buildInputField(
                 label: "Họ và tên",
-                onChanged: (fullName) => signUpCubit.add(SignUpFullNameChanged(fullName)),
+                onChanged: (fullName) => signUpCubit.onFullNameChanged(fullName),
                 errorText: state.fullNameError,
               ),
               const SizedBox(height: 10),
               // Email field
               _buildInputField(
                 label: "Email",
-                onChanged: (email) => signUpCubit.add(SignUpEmailChanged(email)),
+                onChanged: (email) => signUpCubit.onEmailChanged(email),
                 errorText: state.emailError,
               ),
               const SizedBox(height: 10),
               // Password field
               _buildInputField(
                 label: "Mật khẩu",
-                onChanged: (password) => signUpCubit.add(SignUpPasswordChanged(password)),
+                onChanged: (password) => signUpCubit.onPasswordChanged(password),
                 errorText: state.passwordError,
 
                 obscureText: true,
@@ -104,7 +103,7 @@ class _SignUpFormState extends State<SignUpForm> {
               // Confirm Password field
               _buildInputField(
                 label: "Xác nhận mật khẩu",
-                onChanged: (confirmPassword) => signUpCubit.add(SignUpConfirmPasswordChanged(confirmPassword)),
+                onChanged: (confirmPassword) => signUpCubit.onConfirmPasswordChanged(confirmPassword),
                 errorText: state.confirmPasswordError,
                 obscureText: true,
               ),
@@ -130,7 +129,7 @@ class _SignUpFormState extends State<SignUpForm> {
               state.isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
-                onPressed: () => signUpCubit.add(SignUpSubmitted()),
+                onPressed: () => signUpCubit.signUp(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepOrange,
                   padding: const EdgeInsets.symmetric(vertical: 16),

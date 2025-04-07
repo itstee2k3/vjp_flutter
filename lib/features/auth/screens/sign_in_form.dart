@@ -30,14 +30,9 @@ class _SignInFormState extends State<SignInForm> {
     return RepaintBoundary(
       child: BlocConsumer<SignInCubit, SignInState>(
         listener: (context, state) {
-          // if (state.errorMessage.isNotEmpty) {
-          //   ScaffoldMessenger.of(context).showSnackBar(
-          //     SnackBar(
-          //       content: Text(state.errorMessage),
-          //       backgroundColor: Colors.red,
-          //     ),
-          //   );
-          // }
+          if (state.isSuccess) {
+            Navigator.of(context).pop();
+          }
         },
         builder: (context, state) {
           return AnimatedContainer(

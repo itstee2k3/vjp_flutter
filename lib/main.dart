@@ -48,24 +48,6 @@ class MyApp extends StatelessWidget {
           BlocProvider<MainCubit>(
             create: (context) => MainCubit(),
           ),
-          BlocProvider<GroupChatListCubit>(
-            create: (context) {
-              final authCubit = context.read<AuthCubit>();
-              final token = authCubit.state.accessToken;
-              final userId = authCubit.state.userId;
-
-              if (token == null || token.isEmpty || userId == null) {
-                throw Exception('User not authenticated');
-              }
-
-              final groupChatApiService = GroupChatApiService(
-                token: token,
-                currentUserId: userId,
-              );
-
-              return GroupChatListCubit(groupChatApiService)..loadGroups();
-            },
-          ),
         ],
         child: Builder(
           builder: (context) {

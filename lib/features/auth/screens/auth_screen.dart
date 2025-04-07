@@ -42,7 +42,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       child: const SignUpForm(),
                     )
                   : BlocProvider(
-                      create: (context) => SignInCubit(apiService, authCubit, context),
+                      create: (context) => SignInCubit(apiService, authCubit),
                       child: const SignInForm(),
                     ),
             ),

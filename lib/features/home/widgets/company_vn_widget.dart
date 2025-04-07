@@ -3,6 +3,7 @@ import '../../../data/models/company.dart';
 import '../../../data/sample_data/companies_data.dart';
 import '../../../features/home/screens/company_detail_screen.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../main/cubits/main_cubit.dart';
 
@@ -274,12 +275,8 @@ class _CompanyVnWidgetState extends State<CompanyVnWidget> with TickerProviderSt
                                         color: Colors.transparent,
                                         child: InkWell(
                                           onTap: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => CompanyDetailScreen(company: company),
-                                              ),
-                                            );
+                                            // Use go_router to navigate
+                                            context.push('/company/${company.id}');
                                           },
 
                                           splashColor: const Color(0xFF002C90).withOpacity(0.1),

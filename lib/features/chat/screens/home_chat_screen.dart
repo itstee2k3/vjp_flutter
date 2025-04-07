@@ -15,6 +15,7 @@ import '../cubits/personal/personal_chat_cubit.dart';
 import '../cubits/group/group_chat_cubit.dart';
 import 'personal/personal_message_screen.dart';
 import 'group/group_message_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class HomeChatScreen extends StatefulWidget {
   const HomeChatScreen({Key? key}) : super(key: key);
@@ -101,24 +102,8 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
 
     if (!context.mounted) return;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BlocProvider(
-          create: (context) => PersonalChatCubit(
-            ChatApiService(
-              token: token,
-              currentUserId: currentUserId,
-            ),
-            selectedUser.id,
-          ),
-          child: PersonalMessageScreen(
-            username: selectedUser.fullName,
-            userId: selectedUser.id,
-          ),
-        ),
-      ),
-    );
+    // Use go_router push
+    context.push('/chat/personal/${selectedUser.id}?username=${Uri.encodeComponent(selectedUser.fullName)}');
   }
 
   void _handleGroupTap(BuildContext context, GroupChat group) async {
@@ -132,24 +117,8 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
 
     if (!context.mounted) return;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BlocProvider(
-          create: (context) => GroupChatCubit(
-            apiService: GroupChatApiService(
-              token: token,
-              currentUserId: currentUserId,
-            ),
-            groupId: group.id,
-          ),
-          child: GroupMessageScreen(
-            groupName: group.name,
-            groupId: group.id,
-          ),
-        ),
-      ),
-    );
+    // Use go_router push
+    context.push('/chat/group/${group.id}?groupName=${Uri.encodeComponent(group.name)}');
   }
 
   @override

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../data/sample_data/companies_data.dart';
 import '../../features/auth/cubits/auth_cubit.dart';
 import '../../features/auth/screens/auth_screen.dart';
+import '../../features/home/screens/company_detail_screen.dart';
 import '../../features/main/screens/main_screen.dart';
 import '../../features/main/cubits/main_cubit.dart';
 import '../../features/chat/screens/home_chat_screen.dart';
@@ -127,6 +129,17 @@ final router = GoRouter(
     GoRoute(
       path: '/group-list',
       builder: (context, state) => const GroupListScreen(),
+    ),
+    GoRoute(
+      path: '/company/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        final company = sampleCompanies.firstWhere(
+          (company) => company.id == id,
+          orElse: () => sampleCompanies.first,
+          );
+        return CompanyDetailScreen(company: company);
+      },
     ),
   ],
 );

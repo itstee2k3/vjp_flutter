@@ -9,9 +9,8 @@ import '../../../../core/validators/auth_validator.dart';
 class SignInCubit extends Cubit<SignInState> {
   final ApiService _apiService;
   final AuthCubit _authCubit;
-  final BuildContext context;
 
-  SignInCubit(this._apiService, this._authCubit, this.context) : super(const SignInState());
+  SignInCubit(this._apiService, this._authCubit) : super(const SignInState());
 
   void onEmailChanged(String email) {
     final emailTrimmed = email.trim();
@@ -49,11 +48,6 @@ class SignInCubit extends Cubit<SignInState> {
           isSuccess: true,
           message: result['message'],
         ));
-        
-        // Chỉ đóng dialog đăng nhập
-        if (context.mounted) {
-          Navigator.of(context).pop();
-        }
       } else {
         emit(state.copyWith(
           isLoading: false,
