@@ -129,7 +129,31 @@ class _HomeChatScreenState extends State<HomeChatScreen> with SingleTickerProvid
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black), // Đặt màu icon về đen
+        iconTheme: const IconThemeData(color: Colors.black),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_search_outlined),
+            tooltip: 'Tìm bạn bè',
+            onPressed: () {
+              context.push('/search-users');
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.people_outline),
+            tooltip: 'Danh sách bạn bè',
+            onPressed: () {
+              context.push('/friends');
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.group_add_outlined),
+            tooltip: 'Yêu cầu kết bạn',
+            onPressed: () {
+              context.push('/friend-requests');
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.black,

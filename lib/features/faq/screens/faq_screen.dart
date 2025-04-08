@@ -69,7 +69,7 @@ class _FAQScreenState extends State<FAQScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 20,
-                      color: Colors.black,
+                      color: Colors.blueAccent,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

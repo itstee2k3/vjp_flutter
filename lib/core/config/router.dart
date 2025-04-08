@@ -1,9 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/sample_data/companies_data.dart';
 import '../../features/auth/cubits/auth_cubit.dart';
 import '../../features/auth/screens/auth_screen.dart';
+import '../../features/friendship/cubits/friend_request_cubit.dart';
+import '../../features/friendship/cubits/user_search_cubit.dart';
 import '../../features/home/screens/company_detail_screen.dart';
 import '../../features/main/screens/main_screen.dart';
 import '../../features/main/cubits/main_cubit.dart';
@@ -13,10 +16,15 @@ import '../../features/chat/cubits/group/group_chat_cubit.dart';
 import '../../features/chat/cubits/personal/personal_chat_list_cubit.dart';
 import '../../features/chat/cubits/group/group_chat_list_cubit.dart';
 import '../../services/api/chat_api_service.dart';
+import '../../services/api/friendship_api_service.dart';
 import '../../services/api/group_chat_api_service.dart';
 import '../../features/chat/screens/group/group_list_screen.dart';
 import '../../features/chat/screens/personal/personal_message_screen.dart';
 import '../../features/chat/cubits/personal/personal_chat_cubit.dart';
+import '../../features/friendship/screens/user_search_screen.dart';
+import '../../features/friendship/screens/friend_requests_screen.dart';
+import '../../features/friendship/screens/friend_list_screen.dart';
+import '../../features/friendship/cubits/friend_list_cubit.dart'; // Import FriendListCubit
 
 final router = GoRouter(
   initialLocation: '/',
@@ -140,6 +148,49 @@ final router = GoRouter(
           );
         return CompanyDetailScreen(company: company);
       },
+    ),
+    GoRoute(
+      path: '/search-users',
+      builder: (context, state) {
+        // Lấy FriendshipApiService (nên cung cấp toàn cục hoặc lấy instance chuẩn)
+        final dio = Dio(); // Tạm thời
+        final token = context.read<AuthCubit>().state.accessToken;
+        final friendshipService = FriendshipApiService(dio: dio, token: token);
+
+        return BlocProvider(
+          create: (context) => UserSearchCubit(friendshipService),
+          child: const UserSearchScreen(), // <--- Trả về screen
+        );
+      },
+    ),
+    GoRoute(
+      path: '/friend-requests',
+      builder: (context, state) {
+        // Lấy FriendshipApiService
+        final dio = Dio(); // Tạm thời
+        final token = context.read<AuthCubit>().state.accessToken;
+        final friendshipService = FriendshipApiService(dio: dio, token: token);
+
+        return BlocProvider(
+          create: (context) => FriendRequestCubit(friendshipService)..loadPendingRequests(),
+          child: const FriendRequestsScreen(), // <--- Trả về screen
+        );
+      },
+    ),
+    // Thêm route cho danh sách bạn bè
+    GoRoute(
+        path: '/friends', // Đường dẫn ví dụ
+        builder: (context, state) {
+          // Lấy FriendshipApiService
+          final dio = Dio(); // Tạm thời
+          final token = context.read<AuthCubit>().state.accessToken;
+          final friendshipService = FriendshipApiService(dio: dio, token: token);
+
+          return BlocProvider(
+            create: (context) => FriendListCubit(friendshipService)..loadFriends(),
+            child: const FriendListScreen(), // <--- Trả về screen
+          );
+        }
     ),
   ],
 );
