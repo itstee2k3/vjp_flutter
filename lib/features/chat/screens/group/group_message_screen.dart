@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/config/api_config.dart';
 import '../../cubits/group/group_chat_cubit.dart';
 import '../../cubits/group/group_chat_state.dart';
 import '../../widgets/chat_input_field.dart';
@@ -21,14 +23,66 @@ class GroupMessageScreen extends StatefulWidget {
   State<GroupMessageScreen> createState() => _GroupMessageScreenState();
 }
 
-class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreenMixin {
+class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreenMixin, WidgetsBindingObserver {
   final FocusScopeNode _focusNode = FocusScopeNode();
+  DateTime? _lastLeftTime;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     loadMessages(() => context.read<GroupChatCubit>().loadMessages());
     setupMessageStream(context.read<GroupChatCubit>().stream);
+    _loadInitialGroupDetails();
+  }
+
+  void _loadInitialGroupDetails() {
+    if (mounted) {
+      context.read<GroupChatCubit>().reloadGroupDetails();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Called when the app lifecycle state changes (app goes to background/foreground)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshGroupDetails();
+    }
+  }
+
+  // Called when this route is pushed to the navigation stack
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Only refresh if we previously left the screen
+    if (_lastLeftTime != null) {
+      final timeSinceLeft = DateTime.now().difference(_lastLeftTime!);
+      // Only refresh if more than 1 second has passed since leaving
+      if (timeSinceLeft.inSeconds > 1) {
+        _refreshGroupDetails();
+      }
+      _lastLeftTime = null; // Reset the timer
+    }
+  }
+
+  // Keep track of when we navigate away
+  void _recordNavigationAway() {
+    _lastLeftTime = DateTime.now();
+  }
+
+  // Refresh the group details
+  void _refreshGroupDetails() {
+    if (mounted) {
+      print('Refreshing group details');
+      context.read<GroupChatCubit>().reloadGroupDetails();
+    }
   }
 
   @override
@@ -40,12 +94,20 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreen
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: BlocBuilder<GroupChatCubit, GroupChatState>(
             builder: (context, state) {
+              print('Building ChatHeader with avatarUrl: ${state.avatarUrl}');
               return ChatHeader(
                 title: widget.groupName,
                 isGroup: true,
+                avatarUrl: state.avatarUrl,
                 onRefreshPressed: () {
                   print('Refreshing group messages');
                   context.read<GroupChatCubit>().resetAndReloadMessages();
+                },
+                onInfoPressed: () async {
+                  // Record that we're navigating away to info screen
+                  _recordNavigationAway();
+                  // Await the result of navigation to the info screen (result not used directly here)
+                  await context.push('/group-info/${widget.groupId}');
                 },
               );
             },

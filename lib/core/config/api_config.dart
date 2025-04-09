@@ -32,29 +32,28 @@ class ApiConfig {
   
   // Phương thức xử lý URL hình ảnh
   static String getFullImageUrl(String? imageUrl) {
-    // Nếu imageUrl là null hoặc rỗng, trả về một URL mặc định hoặc chuỗi rỗng
+    print('🔍 Processing image URL: $imageUrl');
+    
+    // Nếu imageUrl là null hoặc rỗng, trả về chuỗi rỗng
     if (imageUrl == null || imageUrl.isEmpty) {
-      return ''; // Hoặc URL mặc định
+      print('⚠️ Image URL is null or empty');
+      return '';
     }
 
     // Nếu imageUrl đã là URL đầy đủ (bắt đầu bằng http:// hoặc https://)
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      // Kiểm tra nếu URL chứa localhost hoặc 127.0.0.1
-      if (imageUrl.contains('localhost') || imageUrl.contains('127.0.0.1')) {
-        // Thay thế domain cố định bằng baseUrl hiện tại
-        final path = Uri.parse(imageUrl).path;
-        return '$baseUrl$path';
-      }
+      print('✓ URL is already complete: $imageUrl');
       return imageUrl;
     }
+
+    // Đảm bảo imageUrl bắt đầu bằng /
+    String normalizedPath = imageUrl.startsWith('/') ? imageUrl : '/$imageUrl';
+    print('📝 Normalized path: $normalizedPath');
     
-    // Nếu imageUrl là đường dẫn tương đối (bắt đầu bằng /)
-    if (imageUrl.startsWith('/')) {
-      return '$baseUrl$imageUrl';
-    }
-    
-    // Nếu imageUrl là đường dẫn tương đối (không bắt đầu bằng /)
-    return '$baseUrl/$imageUrl';
+    // Kết hợp với baseUrl
+    String fullUrl = baseUrl + normalizedPath;
+    print('✓ Generated full URL: $fullUrl');
+    return fullUrl;
   }
   
   // Avatar mặc định cho user nếu không có avatar

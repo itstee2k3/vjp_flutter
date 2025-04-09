@@ -74,7 +74,7 @@ class AuthCubit extends Cubit<AuthState> {
         'email': email,
       };
 
-      print('Emitting auth state with response: $response');
+      // print('Emitting auth state with response: $response');
       emit(AuthState.fromJson(response));
     } else {
       print('No tokens found, user not authenticated');

@@ -5,6 +5,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../data/models/message.dart';
 import '../../../../data/models/user.dart';
+import '../../../../data/models/group_chat.dart';
 import '../../../../services/api/group_chat_api_service.dart';
 import 'group_chat_state.dart';
 
@@ -14,6 +15,7 @@ class GroupChatCubit extends Cubit<GroupChatState> {
   final GroupChatApiService _apiService;
   final int groupId;
   StreamSubscription? _messageSubscription;
+  StreamSubscription? _avatarUpdateSubscription; // Add avatar update subscription
   final Set<String> _processedMessageIds = {};
   File? _lastImageFile; // Thêm biến này để lưu file ảnh cuối cùng
   
@@ -28,6 +30,8 @@ class GroupChatCubit extends Cubit<GroupChatState> {
     loadMessages();
     _setupMessageStream();
     _loadGroupMembers();
+    _loadGroupDetails();
+    _listenForAvatarUpdates(); // Add avatar update listener
   }
 
   GroupChatApiService get apiService => _apiService;
@@ -56,6 +60,84 @@ class GroupChatCubit extends Cubit<GroupChatState> {
   // Phương thức lấy thông tin người dùng từ ID
   Map<String, dynamic>? getUserInfo(String userId) {
     return _userInfoCache[userId];
+  }
+
+  // New method to load group details (including avatar)
+  Future<void> _loadGroupDetails() async {
+    try {
+      print('📱 Loading initial group details for group: $groupId');
+      final group = await _apiService.getGroupDetails(groupId);
+      if (group != null) {
+        print('✓ Loaded group details:');
+        print('Name: ${group.name}');
+        print('Avatar URL: ${group.avatarUrl}');
+        
+        if (group.avatarUrl != null && group.avatarUrl!.isNotEmpty) {
+          final timestampedUrl = group.avatarUrl;
+          emit(state.copyWith(groupAvatarUrl: timestampedUrl));
+          print('✓ Updated state with avatar URL: $timestampedUrl');
+        } else {
+          print('⚠️ Group has no avatar URL');
+          // Thử lấy thông tin từ danh sách nhóm
+          _tryGetAvatarFromGroupList();
+        }
+      } else {
+        print('⚠️ Could not load group details');
+        // Thử lấy thông tin từ danh sách nhóm
+        _tryGetAvatarFromGroupList();
+      }
+    } catch (e) {
+      print('❌ Error loading group details: $e');
+      // Thử lấy thông tin từ danh sách nhóm
+      _tryGetAvatarFromGroupList();
+    }
+  }
+  
+  // Phương thức để lấy avatar từ danh sách nhóm đã được tải trước đó
+  Future<void> _tryGetAvatarFromGroupList() async {
+    try {
+      print('🔍 Trying to get avatar from group list for group: $groupId');
+      final groups = await _apiService.getMyGroups();
+      final matchingGroup = groups.firstWhere(
+        (g) => g.id == groupId,
+        orElse: () => throw Exception('Group not found in user\'s list'),
+      );
+      
+      if (matchingGroup.avatarUrl != null && matchingGroup.avatarUrl!.isNotEmpty) {
+        print('✓ Found avatar URL in group list: ${matchingGroup.avatarUrl}');
+        emit(state.copyWith(groupAvatarUrl: matchingGroup.avatarUrl));
+      } else {
+        print('⚠️ No avatar URL found in group list');
+      }
+    } catch (e) {
+      print('❌ Error getting avatar from group list: $e');
+    }
+  }
+
+  // Method to manually reload group details when returning from info screen
+  Future<void> reloadGroupDetails() async {
+    try {
+      print("🔄 Checking if group details need reloading for group: $groupId");
+      
+      // Fetch fresh group details
+      final group = await _apiService.getGroupDetails(groupId);
+      if (group != null) {
+        print("📱 Current avatar: ${state.avatarUrl}");
+        print("📱 New avatar: ${group.avatarUrl}");
+        
+        if (group.avatarUrl != null && group.avatarUrl!.isNotEmpty) {
+          final timestampedUrl = group.avatarUrl;
+          if (timestampedUrl != state.avatarUrl) {
+            print("✓ Updating avatar URL in state");
+            emit(state.copyWith(groupAvatarUrl: timestampedUrl));
+          } else {
+            print("ℹ️ Avatar URL unchanged, skipping update");
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ Error reloading group details: $e');
+    }
   }
 
   Future<void> loadMessages() async {
@@ -549,10 +631,60 @@ class GroupChatCubit extends Cubit<GroupChatState> {
     loadMessages();
   }
 
+  // Add method to listen for avatar updates
+  void _listenForAvatarUpdates() {
+    _avatarUpdateSubscription = _apiService.onGroupAvatarUpdated.listen(
+      (update) {
+        try {
+          if (update == null) {
+            print('⚠️ Received null update in avatar stream');
+            return;
+          }
+
+          final updateGroupId = update['groupId'];
+          final newAvatarUrl = update['avatarUrl'];
+
+          if (updateGroupId == null || newAvatarUrl == null) {
+            print('⚠️ Missing required fields in avatar update: groupId=$updateGroupId, avatarUrl=$newAvatarUrl');
+            return;
+          }
+          
+          // Only update if this is for our group
+          if (updateGroupId == groupId) {
+            print('📱 Received avatar update via SignalR: $newAvatarUrl');
+            
+            // Step 1: Emit null to show placeholder and potentially clear old image state
+            emit(state.copyWith(groupAvatarUrl: null)); 
+
+            // Step 2: After a short delay, emit the actual new URL
+            Future.delayed(const Duration(milliseconds: 100), () {
+               if (this.isClosed) return; // Check if cubit is already closed
+               print('📱 Emitting actual new avatar URL after delay: $newAvatarUrl');
+               emit(state.copyWith(groupAvatarUrl: newAvatarUrl));
+            });
+          }
+        } catch (e) {
+          print('❌ Error processing avatar update: $e');
+          // Don't rethrow - we want to keep listening for future updates
+        }
+      },
+      onError: (error) {
+        print('❌ Error in avatar update stream: $error');
+        // Stream will continue listening
+      },
+    );
+  }
+
+  void updateAvatarUrlLocally(String newAvatarUrl) {
+    print('📱 Updating group avatar locally in Cubit state: $newAvatarUrl');
+    emit(state.copyWith(groupAvatarUrl: newAvatarUrl));
+  }
+
   @override
   Future<void> close() {
     _messageSubscription?.cancel();
+    _avatarUpdateSubscription?.cancel(); // Cancel avatar subscription
     _processedMessageIds.clear();
     return super.close();
   }
-} 
+}

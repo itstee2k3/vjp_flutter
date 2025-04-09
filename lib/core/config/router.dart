@@ -24,7 +24,10 @@ import '../../features/chat/cubits/personal/personal_chat_cubit.dart';
 import '../../features/friendship/screens/user_search_screen.dart';
 import '../../features/friendship/screens/friend_requests_screen.dart';
 import '../../features/friendship/screens/friend_list_screen.dart';
-import '../../features/friendship/cubits/friend_list_cubit.dart'; // Import FriendListCubit
+import '../../features/friendship/cubits/friend_list_cubit.dart';
+import '../../features/chat/screens/group/group_info_screen.dart';
+import '../../features/chat/cubits/group/group_info_cubit.dart';
+import '../../core/config/api_config.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -67,7 +70,7 @@ final router = GoRouter(
               )..loadUsers(),
             ),
             BlocProvider<GroupChatListCubit>(
-              create: (context) => GroupChatListCubit(groupChatApiService)..loadGroups(),
+              create: (context) => GroupChatListCubit(groupChatApiService),
             ),
           ],
           child: const HomeChatScreen(),
@@ -136,7 +139,13 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/group-list',
-      builder: (context, state) => const GroupListScreen(),
+      builder: (context, state) {
+        // Check if GroupChatListCubit already exists in parent
+        if (context.read<GroupChatListCubit>().state.groups.isEmpty) {
+          context.read<GroupChatListCubit>().loadGroups();
+        }
+        return const GroupListScreen();
+      },
     ),
     GoRoute(
       path: '/company/:id',
@@ -152,45 +161,79 @@ final router = GoRouter(
     GoRoute(
       path: '/search-users',
       builder: (context, state) {
-        // Lấy FriendshipApiService (nên cung cấp toàn cục hoặc lấy instance chuẩn)
-        final dio = Dio(); // Tạm thời
-        final token = context.read<AuthCubit>().state.accessToken;
-        final friendshipService = FriendshipApiService(dio: dio, token: token);
+        final authState = context.read<AuthCubit>().state;
+        if (authState.accessToken == null) {
+          return const Center(child: Text('Authentication required'));
+        }
+        final friendshipService = FriendshipApiService(dio: Dio(BaseOptions(baseUrl: ApiConfig.baseUrl)), token: authState.accessToken);
 
         return BlocProvider(
           create: (context) => UserSearchCubit(friendshipService),
-          child: const UserSearchScreen(), // <--- Trả về screen
+          child: const UserSearchScreen(),
         );
       },
     ),
     GoRoute(
       path: '/friend-requests',
       builder: (context, state) {
-        // Lấy FriendshipApiService
-        final dio = Dio(); // Tạm thời
-        final token = context.read<AuthCubit>().state.accessToken;
-        final friendshipService = FriendshipApiService(dio: dio, token: token);
+        final authState = context.read<AuthCubit>().state;
+         if (authState.accessToken == null) {
+          return const Center(child: Text('Authentication required'));
+        }
+        final friendshipService = FriendshipApiService(dio: Dio(BaseOptions(baseUrl: ApiConfig.baseUrl)), token: authState.accessToken);
 
         return BlocProvider(
           create: (context) => FriendRequestCubit(friendshipService)..loadPendingRequests(),
-          child: const FriendRequestsScreen(), // <--- Trả về screen
+          child: const FriendRequestsScreen(),
         );
       },
     ),
-    // Thêm route cho danh sách bạn bè
     GoRoute(
-        path: '/friends', // Đường dẫn ví dụ
+        path: '/friends',
         builder: (context, state) {
-          // Lấy FriendshipApiService
-          final dio = Dio(); // Tạm thời
-          final token = context.read<AuthCubit>().state.accessToken;
-          final friendshipService = FriendshipApiService(dio: dio, token: token);
+          final authState = context.read<AuthCubit>().state;
+           if (authState.accessToken == null) {
+            return const Center(child: Text('Authentication required'));
+          }
+          final friendshipService = FriendshipApiService(dio: Dio(BaseOptions(baseUrl: ApiConfig.baseUrl)), token: authState.accessToken);
 
           return BlocProvider(
             create: (context) => FriendListCubit(friendshipService)..loadFriends(),
-            child: const FriendListScreen(), // <--- Trả về screen
+            child: const FriendListScreen(),
           );
         }
+    ),
+    GoRoute(
+      path: '/group-info/:groupId',
+      builder: (context, state) {
+        final groupIdString = state.pathParameters['groupId'];
+        if (groupIdString == null) {
+          return const Scaffold(body: Center(child: Text('Missing Group ID')));
+        }
+        try {
+          final groupId = int.parse(groupIdString);
+
+          final authState = context.read<AuthCubit>().state;
+          final token = authState.accessToken;
+          final userId = authState.userId;
+
+          if (token == null || userId == null) {
+             return const Scaffold(body: Center(child: Text('User not authenticated')));
+          }
+
+          final groupChatApiService = GroupChatApiService(
+            token: token,
+            currentUserId: userId,
+          );
+
+          return BlocProvider(
+            create: (context) => GroupInfoCubit(groupChatApiService, groupId),
+            child: GroupInfoScreen(groupId: groupId),
+          );
+        } catch (e) {
+          return Scaffold(body: Center(child: Text('Invalid Group ID: $groupIdString. Error: $e')));
+        }
+      },
     ),
   ],
 );

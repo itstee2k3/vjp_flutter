@@ -515,7 +515,7 @@ class ChatApiService {
       "Content-Type": "application/json",
       "Authorization": "Bearer $token",
     };
-    print('Request headers: $headers');
+    // print('Request headers: $headers');
     return headers;
   }
 

@@ -15,6 +15,7 @@ class GroupChatApiService {
   final String? token;
   final String? currentUserId;
   final _messageController = StreamController<Message>.broadcast();
+  final _groupAvatarUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   late final HubConnection _hubConnection;
   final Dio _dio;
   final Set<String> _processedMessageIds = {};
@@ -22,11 +23,13 @@ class GroupChatApiService {
   final Duration _minimumImageSendInterval = Duration(seconds: 2);
 
   Stream<Message> get onMessageReceived => _messageController.stream;
+  Stream<Map<String, dynamic>> get onGroupAvatarUpdated => _groupAvatarUpdateController.stream;
 
   GroupChatApiService({
     required this.token,
     required this.currentUserId,
   }) : _dio = Dio(BaseOptions(baseUrl: ApiConfig.baseUrl)) {
+    _dio.options.headers['Authorization'] = 'Bearer $token';
     _initSignalR();
   }
 
@@ -99,20 +102,42 @@ class GroupChatApiService {
       }
     });
 
+    // Add GroupAvatarUpdated event handler
+    _hubConnection.on('GroupImageUpdated', (List<Object?>? args) { 
+      if (args != null && args.isNotEmpty && args[0] is Map) {
+        try {
+          final data = Map<String, dynamic>.from(args[0] as Map);
+          final groupId = data['groupId'] as int?;
+          final newAvatarUrl = data['imageUrl'] as String?; // <<< Lấy từ key 'imageUrl'
+
+          if (groupId != null && newAvatarUrl != null) {
+             print('📱 Received GroupImageUpdated event - Group: $groupId, New Avatar (imageUrl): $newAvatarUrl');
+             // Gửi đi thông báo với key 'avatarUrl' mà các cubit đang dùng
+             notifyGroupAvatarUpdated(groupId, newAvatarUrl); 
+          } else {
+             print('❌ Error processing GroupImageUpdated payload: Missing groupId or imageUrl');
+          }
+        } catch (e, s) {
+          print('❌ Error processing GroupImageUpdated event data: $e');
+          print(s); // Print stacktrace for detailed debugging
+        }
+      }
+    });
+
     try {
       await _hubConnection.start();
-      print('SignalR connection started');
+      // print('SignalR connection started');
       
       // Join all groups that the user is a member of
       if (currentUserId != null) {
         try {
           final groups = await getMyGroups();
-          print('Joining SignalR groups for groups: ${groups.map((g) => g.id).join(', ')}');
+          // print('Joining SignalR groups for groups: ${groups.map((g) => g.id).join(', ')}');
           
           for (var group in groups) {
             final groupName = 'group_${group.id}';
             await _hubConnection.invoke('JoinRoom', args: [groupName]);
-            print('Joined SignalR room: $groupName');
+            // print('Joined SignalR room: $groupName');
           }
         } catch (e) {
           print('Error joining group rooms: $e');
@@ -125,7 +150,7 @@ class GroupChatApiService {
 
   Future<List<GroupChat>> getMyGroups() async {
     try {
-      print('Calling API: ${_dio.options.baseUrl}/api/group');
+      // print('Calling API: ${_dio.options.baseUrl}/api/group');
       
       final response = await _dio.get(
         '/api/group',
@@ -135,8 +160,8 @@ class GroupChatApiService {
         ),
       );
       
-      print('GetMyGroups response status: ${response.statusCode}');
-      print('GetMyGroups response data: ${response.data}');
+      // print('GetMyGroups response status: ${response.statusCode}');
+      // print('GetMyGroups response data: ${response.data}');
       
       if (response.statusCode != 200) {
         throw Exception('Failed to get groups: HTTP ${response.statusCode}, Response: ${response.data}');
@@ -442,9 +467,94 @@ class GroupChatApiService {
     }
   }
 
+  Future<String?> updateGroupAvatar(int groupId, File imageFile) async {
+    try {
+      String fileName = imageFile.path.split('/').last;
+      FormData formData = FormData.fromMap({
+        "file": await MultipartFile.fromFile(imageFile.path, filename: fileName),
+      });
+
+      print('Uploading new avatar for group: $groupId');
+
+      final response = await _dio.post(
+        '/api/group/$groupId/avatar',
+        data: formData,
+        options: Options(
+          sendTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final newAvatarPath = response.data['imageUrl'] as String?;
+        print('Group avatar updated successfully. New path: $newAvatarPath');
+        
+        if (newAvatarPath != null) {
+          notifyGroupAvatarUpdated(groupId, newAvatarPath);
+          return newAvatarPath;
+        } else {
+          print('Error: Server response missing imageUrl');
+          throw Exception('API did not return the new avatar URL');
+        }
+      } else {
+        print('Error updating group avatar: Status ${response.statusCode}, Data: ${response.data}');
+        throw Exception('Failed to update avatar: Server returned ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      print('Dio Error updating group avatar: ${e.response?.statusCode} - ${e.response?.data}');
+      throw Exception('Failed to update avatar: ${e.message ?? e.toString()}');
+    } catch (e) {
+      print('Error updating group avatar: $e');
+      throw Exception('An unexpected error occurred while updating avatar: $e');
+    }
+  }
+
+  void notifyGroupAvatarUpdated(int groupId, String newAvatarUrl) {
+    print('Group avatar updated notification: Group $groupId, new avatar: $newAvatarUrl');
+    _groupAvatarUpdateController.add({
+      'groupId': groupId,
+      'avatarUrl': newAvatarUrl,
+    });
+  }
+
   void dispose() {
     _messageController.close();
+    _groupAvatarUpdateController.close();
     _hubConnection.stop();
     _processedMessageIds.clear();
+  }
+
+  // Add method to clear group cache
+  Future<void> clearGroupCache() async {
+    // Simple implementation just logs the action
+    // In a real app, you might have an actual cache to clear
+    print('📋 Clearing group cache to force a fresh reload');
+    // You could potentially add actual cache clearing logic here
+    // For example:
+    // _groupCache.clear();
+  }
+
+  Future<GroupChat?> getGroupDetails(int groupId) async {
+    try {
+      print('🔍 Fetching details for group: $groupId');
+      final response = await _dio.get('/api/group/$groupId');
+      
+      if (response.statusCode == 200 && response.data != null) {
+        print('✓ Group details received: ${response.data}');
+        return GroupChat(
+          id: response.data['id'],
+          name: response.data['name'],
+          avatarUrl: response.data['avatar'],
+          memberCount: response.data['memberCount'] ?? 0,
+          isAdmin: response.data['isAdmin'] ?? false,
+          createdAt: DateTime.parse(response.data['createdAt']),
+        );
+      }
+      print('⚠️ No data received for group: $groupId');
+      return null;
+    } catch (e) {
+      print('❌ Error getting group details: $e');
+      return null;
+    }
   }
 } 

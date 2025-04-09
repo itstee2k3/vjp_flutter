@@ -98,7 +98,7 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
       if (position.pixels < position.minScrollExtent) {
         final overscrollAmount = position.minScrollExtent - position.pixels;
         final progress = (overscrollAmount / _overscrollThreshold).clamp(0.0, 1.0);
-        print('Overscroll update: amount=$overscrollAmount, progress=$progress, threshold=$_overscrollThreshold');
+        // print('Overscroll update: amount=$overscrollAmount, progress=$progress, threshold=$_overscrollThreshold');
 
         setState(() {
           _isOverscrolling = true;
@@ -116,7 +116,7 @@ class _MessageListState extends State<MessageList> with SingleTickerProviderStat
         });
       }
     } else if (notification is ScrollEndNotification) {
-      print('Scroll end: shouldLoadMore=$_shouldLoadMore, hasMoreMessages=${widget.hasMoreMessages}, isLoadingMore=${widget.isLoadingMore}');
+      // print('Scroll end: shouldLoadMore=$_shouldLoadMore, hasMoreMessages=${widget.hasMoreMessages}, isLoadingMore=${widget.isLoadingMore}');
 
       if (_shouldLoadMore && widget.hasMoreMessages && !widget.isLoadingMore) {
         print('Triggering load more messages...');
