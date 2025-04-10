@@ -16,6 +16,7 @@ class GroupChatApiService {
   final String? currentUserId;
   final _messageController = StreamController<Message>.broadcast();
   final _groupAvatarUpdateController = StreamController<Map<String, dynamic>>.broadcast();
+  final _groupNameUpdateController = StreamController<Map<String, dynamic>>.broadcast();
   late final HubConnection _hubConnection;
   final Dio _dio;
   final Set<String> _processedMessageIds = {};
@@ -24,6 +25,7 @@ class GroupChatApiService {
 
   Stream<Message> get onMessageReceived => _messageController.stream;
   Stream<Map<String, dynamic>> get onGroupAvatarUpdated => _groupAvatarUpdateController.stream;
+  Stream<Map<String, dynamic>> get onGroupNameUpdated => _groupNameUpdateController.stream;
 
   GroupChatApiService({
     required this.token,
@@ -120,6 +122,27 @@ class GroupChatApiService {
         } catch (e, s) {
           print('❌ Error processing GroupImageUpdated event data: $e');
           print(s); // Print stacktrace for detailed debugging
+        }
+      }
+    });
+
+    // Add GroupNameUpdated event handler
+    _hubConnection.on('GroupNameUpdated', (List<Object?>? args) {
+      if (args != null && args.isNotEmpty && args[0] is Map) {
+        try {
+          final data = Map<String, dynamic>.from(args[0] as Map);
+          final groupId = data['groupId'] as int?;
+          final name = data['name'] as String?;
+
+          if (groupId != null && name != null) {
+             print('📱 Received GroupNameUpdated event - Group: $groupId, Name: $name');
+             notifyGroupNameUpdated(groupId, name);
+          } else {
+             print('❌ Error processing GroupNameUpdated payload: Missing groupId or name. Data: $data');
+          }
+        } catch (e, s) {
+          print('❌ Error processing GroupNameUpdated event data: $e');
+          print(s); 
         }
       }
     });
@@ -517,9 +540,18 @@ class GroupChatApiService {
     });
   }
 
+  void notifyGroupNameUpdated(int groupId, String newName) {
+    print('Group name updated notification: Group $groupId, new name: $newName');
+    _groupNameUpdateController.add({
+      'groupId': groupId,
+      'name': newName,
+    });
+  }
+
   void dispose() {
     _messageController.close();
     _groupAvatarUpdateController.close();
+    _groupNameUpdateController.close();
     _hubConnection.stop();
     _processedMessageIds.clear();
   }
@@ -555,6 +587,29 @@ class GroupChatApiService {
     } catch (e) {
       print('❌ Error getting group details: $e');
       return null;
+    }
+  }
+
+  Future<void> updateGroupName(int groupId, String newName) async {
+    try {
+      print('Updating group name for group: $groupId to $newName');
+      final response = await _dio.put(
+        '/api/group/$groupId/name',
+        data: {'name': newName},
+      );
+
+      if (response.statusCode == 200) {
+        print('Group name updated successfully via API.');
+      } else {
+        print('Error updating group name via API: Status ${response.statusCode}, Data: ${response.data}');
+        throw Exception('Failed to update group name: Server returned ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      print('Dio Error updating group name: ${e.response?.statusCode} - ${e.response?.data}');
+      throw Exception('Failed to update group name: ${e.message ?? e.toString()}');
+    } catch (e) {
+      print('Error updating group name: $e');
+      throw Exception('An unexpected error occurred while updating group name: $e');
     }
   }
 } 

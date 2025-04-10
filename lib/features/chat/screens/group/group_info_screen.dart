@@ -84,6 +84,60 @@ class GroupInfoScreen extends StatelessWidget {
     }
   }
 
+  // Method to show the edit group name dialog
+  Future<void> _showEditGroupNameDialog(BuildContext context, String currentName) async {
+    final TextEditingController nameController = TextEditingController(text: currentName);
+    final cubit = context.read<GroupInfoCubit>();
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Edit Group Name'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(hintText: "Enter new group name"),
+                  autofocus: true,
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(); // Dismiss the dialog
+              },
+            ),
+            TextButton(
+              child: const Text('Update'),
+              onPressed: () async {
+                final newName = nameController.text.trim();
+                if (newName.isNotEmpty && newName != currentName) {
+                  Navigator.of(dialogContext).pop(); // Dismiss the dialog first
+                  await cubit.updateGroupName(newName);
+                } else if (newName.isEmpty) {
+                   // Optionally show an error if the name is empty
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     const SnackBar(content: Text('Group name cannot be empty.'), backgroundColor: Colors.orange,)
+                   );
+                }
+                // If name hasn't changed, simply dismiss
+                 else {
+                    Navigator.of(dialogContext).pop();
+                 }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<GroupInfoCubit, GroupInfoState>(
@@ -93,6 +147,18 @@ class GroupInfoScreen extends StatelessWidget {
             ..hideCurrentSnackBar()
             ..showSnackBar(
               SnackBar(content: Text(state.errorMessage!), backgroundColor: Colors.red),
+            );
+        } else if (state.status == GroupInfoStatus.success && state.groupNameUpdateStatus == GroupNameUpdateStatus.success) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(content: Text('Group name updated successfully!'), backgroundColor: Colors.green,)
+            );
+        } else if (state.status == GroupInfoStatus.failure && state.groupNameUpdateStatus == GroupNameUpdateStatus.failure) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+               SnackBar(content: Text('Failed to update group name: ${state.errorMessage ?? 'Unknown error'}'), backgroundColor: Colors.red,)
             );
         }
       },
@@ -346,7 +412,10 @@ class GroupInfoScreen extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     splashRadius: 20,
-                    onPressed: () { /* TODO: Handle edit group name */ },
+                    onPressed: () {
+                       // Show the edit dialog
+                       _showEditGroupNameDialog(context, groupName);
+                    },
                     tooltip: 'Edit group name',
                   ),
                 ),

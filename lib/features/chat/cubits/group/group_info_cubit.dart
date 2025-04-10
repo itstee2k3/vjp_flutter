@@ -61,5 +61,40 @@ class GroupInfoCubit extends Cubit<GroupInfoState> {
     }
   }
 
-  // Potential future methods: updateGroupName, addMembers, removeMember, leaveGroup...
+  Future<void> updateGroupName(String newName) async {
+    if (state.status == GroupInfoStatus.updatingName) return;
+    emit(state.copyWith(
+      status: GroupInfoStatus.updatingName, 
+      groupNameUpdateStatus: GroupNameUpdateStatus.none,
+      clearError: true
+    ));
+    try {
+      // Call the actual API method
+      await _apiService.updateGroupName(groupId, newName);
+      
+      // Backend should send SignalR notification upon success.
+      // We optimistically update the UI here, SignalR listener will confirm/sync other clients.
+
+      // Update the group name in the local state
+      emit(state.copyWith(
+        status: GroupInfoStatus.success,
+        group: state.group?.copyWith(name: newName),
+        groupNameUpdateStatus: GroupNameUpdateStatus.success,
+      ));
+      
+      // Notify local listeners (e.g., GroupChatCubit if needed directly, though SignalR is preferred)
+      _apiService.notifyGroupNameUpdated(groupId, newName);
+      print('Group name update requested. Local state updated. SignalR should notify others.');
+
+    } catch (e) {
+      print("❌ Error updating group name: $e");
+      emit(state.copyWith(
+        status: GroupInfoStatus.failure, 
+        errorMessage: "Error updating group name: ${e.toString()}",
+        groupNameUpdateStatus: GroupNameUpdateStatus.failure,
+      ));
+    }
+  }
+
+  // Potential future methods: addMembers, removeMember, leaveGroup...
 } 

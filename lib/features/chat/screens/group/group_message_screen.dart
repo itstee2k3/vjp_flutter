@@ -94,9 +94,9 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreen
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: BlocBuilder<GroupChatCubit, GroupChatState>(
             builder: (context, state) {
-              print('Building ChatHeader with avatarUrl: ${state.avatarUrl}');
+              print('Building ChatHeader with name: ${state.groupName}, avatarUrl: ${state.avatarUrl}');
               return ChatHeader(
-                title: widget.groupName,
+                title: state.groupName ?? widget.groupName,
                 isGroup: true,
                 avatarUrl: state.avatarUrl,
                 onRefreshPressed: () {

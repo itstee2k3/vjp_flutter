@@ -12,6 +12,7 @@ class GroupChatState extends Equatable {
   final bool hasMoreMessages;
   final bool isLoadingMore;
   final String? avatarUrl;
+  final String? groupName;
 
   GroupChatState({
     this.messages = const [],
@@ -24,6 +25,7 @@ class GroupChatState extends Equatable {
     this.hasMoreMessages = true,
     this.isLoadingMore = false,
     this.avatarUrl,
+    this.groupName,
   });
 
   GroupChatState copyWith({
@@ -37,6 +39,7 @@ class GroupChatState extends Equatable {
     bool? hasMoreMessages,
     bool? isLoadingMore,
     String? groupAvatarUrl,
+    String? groupName,
   }) {
     return GroupChatState(
       messages: messages ?? this.messages,
@@ -48,7 +51,8 @@ class GroupChatState extends Equatable {
       currentPage: currentPage ?? this.currentPage,
       hasMoreMessages: hasMoreMessages ?? this.hasMoreMessages,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-      avatarUrl: groupAvatarUrl ?? this.avatarUrl, // Đảm bảo avatarUrl được cập nhật đúng cách
+      avatarUrl: groupAvatarUrl ?? this.avatarUrl,
+      groupName: groupName ?? this.groupName,
     );
   }
 
@@ -64,5 +68,6 @@ class GroupChatState extends Equatable {
     hasMoreMessages,
     isLoadingMore,
     avatarUrl,
+    groupName,
   ];
 }

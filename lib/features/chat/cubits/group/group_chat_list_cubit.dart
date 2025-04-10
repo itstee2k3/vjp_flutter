@@ -7,11 +7,13 @@ import 'group_chat_list_state.dart';
 class GroupChatListCubit extends Cubit<GroupChatListState> {
   final GroupChatApiService _apiService;
   StreamSubscription? _avatarUpdateSubscription;
+  StreamSubscription? _nameUpdateSubscription;
   bool _isLoading = false;
 
   GroupChatListCubit(this._apiService) : super(GroupChatListState.initial()) {
     // loadGroups();
     _listenForAvatarUpdates();
+    _listenForNameUpdates();
   }
 
   void _listenForAvatarUpdates() {
@@ -28,6 +30,39 @@ class GroupChatListCubit extends Cubit<GroupChatListState> {
       }).toList();
       
       emit(state.copyWith(groups: updatedGroups));
+    });
+  }
+
+  void _listenForNameUpdates() {
+    _nameUpdateSubscription = _apiService.onGroupNameUpdated.listen((update) {
+      // Handle potential null map gracefully
+      if (update == null) {
+        print('❌ Error: Received null update in GroupChatListCubit name listener.');
+        return;
+      }
+      
+      // Safely access data, providing default values or handling nulls
+      final int? groupId = update['groupId'] as int?;
+      final String? name = update['name'] as String?; // Use the correct key 'name'
+
+      if (groupId == null || name == null) {
+         print('❌ Error: Received invalid name update payload in GroupChatListCubit. Data: $update');
+         return;
+      }
+
+      print('Cubit received name update for group $groupId: $name');
+
+      final updatedGroups = state.groups.map((group) {
+        if (group.id == groupId) {
+          print('Updating name in group list for group $groupId to: $name');
+          return group.copyWith(name: name); // Use the correct variable 'name'
+        }
+        return group;
+      }).toList();
+      
+      emit(state.copyWith(groups: updatedGroups));
+    }, onError: (error) {
+      print('❌ Error in GroupChatListCubit name update stream: $error');
     });
   }
 
@@ -108,6 +143,7 @@ class GroupChatListCubit extends Cubit<GroupChatListState> {
   @override
   Future<void> close() {
     _avatarUpdateSubscription?.cancel();
+    _nameUpdateSubscription?.cancel();
     return super.close();
   }
 }

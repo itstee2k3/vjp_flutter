@@ -16,6 +16,7 @@ class GroupChatCubit extends Cubit<GroupChatState> {
   final int groupId;
   StreamSubscription? _messageSubscription;
   StreamSubscription? _avatarUpdateSubscription; // Add avatar update subscription
+  StreamSubscription? _nameUpdateSubscription; // Add name update subscription
   final Set<String> _processedMessageIds = {};
   File? _lastImageFile; // Thêm biến này để lưu file ảnh cuối cùng
   
@@ -32,6 +33,7 @@ class GroupChatCubit extends Cubit<GroupChatState> {
     _loadGroupMembers();
     _loadGroupDetails();
     _listenForAvatarUpdates(); // Add avatar update listener
+    _listenForNameUpdates(); // Add name update listener
   }
 
   GroupChatApiService get apiService => _apiService;
@@ -72,19 +74,17 @@ class GroupChatCubit extends Cubit<GroupChatState> {
         print('Name: ${group.name}');
         print('Avatar URL: ${group.avatarUrl}');
         
-        if (group.avatarUrl != null && group.avatarUrl!.isNotEmpty) {
-          final timestampedUrl = group.avatarUrl;
-          emit(state.copyWith(groupAvatarUrl: timestampedUrl));
-          print('✓ Updated state with avatar URL: $timestampedUrl');
-        } else {
-          print('⚠️ Group has no avatar URL');
-          // Thử lấy thông tin từ danh sách nhóm
-          _tryGetAvatarFromGroupList();
-        }
+        // Emit state with both name and avatar
+        emit(state.copyWith(
+          groupName: group.name,
+          groupAvatarUrl: group.avatarUrl, 
+        ));
+        print('✓ Updated state with name: ${group.name} and avatar URL: ${group.avatarUrl}');
+        
       } else {
         print('⚠️ Could not load group details');
         // Thử lấy thông tin từ danh sách nhóm
-        _tryGetAvatarFromGroupList();
+        _tryGetAvatarFromGroupList(); // Also try to get name from list? Maybe not needed if header falls back.
       }
     } catch (e) {
       print('❌ Error loading group details: $e');
@@ -122,17 +122,35 @@ class GroupChatCubit extends Cubit<GroupChatState> {
       // Fetch fresh group details
       final group = await _apiService.getGroupDetails(groupId);
       if (group != null) {
-        print("📱 Current avatar: ${state.avatarUrl}");
-        print("📱 New avatar: ${group.avatarUrl}");
+        print("📱 Current name: ${state.groupName}, New name: ${group.name}");
+        print("📱 Current avatar: ${state.avatarUrl}, New avatar: ${group.avatarUrl}");
         
-        if (group.avatarUrl != null && group.avatarUrl!.isNotEmpty) {
-          final timestampedUrl = group.avatarUrl;
-          if (timestampedUrl != state.avatarUrl) {
-            print("✓ Updating avatar URL in state");
-            emit(state.copyWith(groupAvatarUrl: timestampedUrl));
-          } else {
-            print("ℹ️ Avatar URL unchanged, skipping update");
-          }
+        bool needsUpdate = false;
+        String? newName = state.groupName;
+        String? newAvatar = state.avatarUrl;
+
+        if (group.name != null && group.name != state.groupName) {
+          newName = group.name;
+          needsUpdate = true;
+          print("✓ Name changed");
+        }
+        
+        if (group.avatarUrl != null && group.avatarUrl != state.avatarUrl) {
+          newAvatar = group.avatarUrl;
+          needsUpdate = true;
+          print("✓ Avatar changed");
+        } else if (group.avatarUrl == null && state.avatarUrl != null) {
+          // Handle case where avatar might have been removed
+          newAvatar = null;
+          needsUpdate = true;
+           print("✓ Avatar removed");
+        }
+
+        if (needsUpdate) {
+          print("✓ Updating state with new details");
+          emit(state.copyWith(groupName: newName, groupAvatarUrl: newAvatar));
+        } else {
+          print("ℹ️ Group details unchanged, skipping update");
         }
       }
     } catch (e) {
@@ -680,10 +698,45 @@ class GroupChatCubit extends Cubit<GroupChatState> {
     emit(state.copyWith(groupAvatarUrl: newAvatarUrl));
   }
 
+  // Add method to listen for name updates
+  void _listenForNameUpdates() {
+    _nameUpdateSubscription = _apiService.onGroupNameUpdated.listen(
+      (update) {
+        try {
+          print('Raw name update received: $update');
+          if (update == null) {
+            print('⚠️ Received null update in name stream');
+            return;
+          }
+
+          final updateGroupId = update['groupId'];
+          final newName = update['name'];
+
+          if (updateGroupId == null || newName == null) {
+            print('⚠️ Missing required fields in name update: groupId=$updateGroupId, name=$newName');
+            return;
+          }
+          
+          // Only update if this is for our group
+          if (updateGroupId == groupId) {
+            print('📱 Received name update via SignalR: $newName');
+            emit(state.copyWith(groupName: newName));
+          }
+        } catch (e) {
+          print('❌ Error processing name update: $e');
+        }
+      },
+      onError: (error) {
+        print('❌ Error in name update stream: $error');
+      },
+    );
+  }
+
   @override
   Future<void> close() {
     _messageSubscription?.cancel();
     _avatarUpdateSubscription?.cancel(); // Cancel avatar subscription
+    _nameUpdateSubscription?.cancel(); // Cancel name subscription
     _processedMessageIds.clear();
     return super.close();
   }
