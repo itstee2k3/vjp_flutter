@@ -5,13 +5,15 @@ import 'package:flutter_socket_io/features/chat/cubits/group/group_chat_list_cub
 import 'package:flutter_socket_io/services/api/group_chat_api_service.dart';
 import 'package:flutter_socket_io/services/api/api_service.dart';
 import 'package:flutter_socket_io/features/main/cubits/main_cubit.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/config/router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+  await initializeDateFormatting('vi', null); // hoặc 'en', 'ja', v.v.
+
   final prefs = await SharedPreferences.getInstance();
   final apiService = ApiService();
 

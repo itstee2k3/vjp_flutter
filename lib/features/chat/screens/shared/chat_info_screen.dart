@@ -9,6 +9,8 @@ import '../../cubits/personal/personal_info_state.dart';
 import '../../../../core/config/api_config.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/painting.dart';
+import '../../cubits/shared/chat_media_cubit.dart';
+import '../../cubits/shared/chat_media_state.dart';
 
 enum ChatType { personal, group }
 
@@ -318,12 +320,16 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
                 ],
 
                 // --- Common Tile: Photos, files, links ---
-                 _buildInfoTile(
+                 _buildMediaPreviewTile(
                   context,
                   icon: Icons.photo_library_outlined,
                   title: 'Ảnh, file, link',
-                  // TODO: Add preview widget like in the image
-                  onTap: () { /* TODO */ },
+                  // Implement navigation logic
+                  onTap: () {
+                    print('Navigate to Media Screen for ${widget.chatIdString} (${widget.chatType.name})');
+                    // Navigate using the new route
+                    context.push('/chat-media/${widget.chatIdString}?chatType=${widget.chatType.name}');
+                  },
                 ),
 
                 // --- Group Specific Tiles (Middle) ---
@@ -682,6 +688,62 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
     );
   }
 
+  // --- Build Specific Tile Types ---
+
+  Widget _buildMediaPreviewTile(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap}) {
+    // Consume the ChatMediaCubit
+    return BlocBuilder<ChatMediaCubit, ChatMediaState>(
+      builder: (context, mediaState) {
+        // Get the actual image URLs from the state
+        final List<String> allImageUrls = mediaState.recentImageUrls;
+        // Take only the first 4 images for the preview
+        final List<String> previewImageUrls = allImageUrls.take(4).toList();
+
+        // Build the tile using InkWell and Column as before
+        return InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: Colors.grey[700], size: 24),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(title, style: const TextStyle(fontSize: 15))
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.grey),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Show preview only if loading finished and the *original* list has images
+                if (mediaState.status == ChatMediaStatus.loading) 
+                  const SizedBox(height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                else if (mediaState.status == ChatMediaStatus.success && allImageUrls.isNotEmpty)
+                  // Pass the limited list to the preview widget
+                  _HorizontalImagePreview(imageUrls: previewImageUrls, onSeeMoreTap: onTap)
+                // Show empty message only if the *original* list is empty after success
+                else if (mediaState.status == ChatMediaStatus.success && allImageUrls.isEmpty)
+                   Padding(
+                     padding: const EdgeInsets.only(left: 40.0, top: 4.0), // Indent like subtitle
+                     child: Text('Chưa có ảnh nào', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                   )
+                // Optionally show an error indicator if mediaState.status == ChatMediaStatus.failure
+                 else if (mediaState.status == ChatMediaStatus.failure)
+                   Padding(
+                     padding: const EdgeInsets.only(left: 40.0, top: 4.0),
+                     child: Text('Lỗi tải ảnh', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.red)),
+                   )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildInfoTile(BuildContext context, {required IconData icon, required String title, String? subtitle, required VoidCallback onTap}) {
      return ListTile(
       leading: Icon(icon, color: Colors.grey[700]),
@@ -701,6 +763,93 @@ class _ChatInfoScreenState extends State<ChatInfoScreen> {
       onChanged: onChanged,
       activeColor: Colors.blue,
       dense: true,
+    );
+  }
+}
+
+class _HorizontalImagePreview extends StatelessWidget {
+  final List<String> imageUrls;
+  final VoidCallback onSeeMoreTap;
+  final double itemSize = 60.0; // Size of each image preview item
+
+  const _HorizontalImagePreview({
+    Key? key,
+    required this.imageUrls,
+    required this.onSeeMoreTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: itemSize, // Constrain the height
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: imageUrls.length + 1, // Add 1 for the "See More" button
+        itemBuilder: (context, index) {
+          if (index < imageUrls.length) {
+            // Image item
+            // Generate the full URL using ApiConfig
+            final fullImageUrl = ApiConfig.getFullImageUrl(imageUrls[index]);
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 6.0), // Spacing between images
+              child: ClipRRect(
+                 borderRadius: BorderRadius.circular(4.0),
+                 child: Image.network(
+                   fullImageUrl, // Use the full URL here
+                   width: itemSize,
+                   height: itemSize,
+                   fit: BoxFit.cover,
+                   // Optional: Add error/loading builders
+                   loadingBuilder: (context, child, loadingProgress) {
+                     if (loadingProgress == null) return child;
+                     return Container(
+                       width: itemSize,
+                       height: itemSize,
+                       color: Colors.grey[200],
+                       child: Center(
+                         child: CircularProgressIndicator(
+                           strokeWidth: 2,
+                           value: loadingProgress.expectedTotalBytes != null
+                               ? loadingProgress.cumulativeBytesLoaded /
+                                   loadingProgress.expectedTotalBytes!
+                               : null,
+                         ),
+                       ),
+                     );
+                   },
+                   errorBuilder: (context, error, stackTrace) {
+                     return Container(
+                       width: itemSize,
+                       height: itemSize,
+                       color: Colors.grey[300],
+                       child: Icon(Icons.broken_image, color: Colors.grey[600], size: 30),
+                     );
+                   },
+                 ),
+              ),
+            );
+          } else {
+            // "See More" button
+            return InkWell(
+              onTap: onSeeMoreTap,
+              child: Container(
+                width: itemSize,
+                height: itemSize,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: Icon(
+                  Icons.arrow_forward,
+                  color: Theme.of(context).primaryColor,
+                  size: 30,
+                ),
+              ),
+            );
+          }
+        },
+      ),
     );
   }
 } 

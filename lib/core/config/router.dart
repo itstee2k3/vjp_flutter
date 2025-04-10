@@ -29,6 +29,8 @@ import '../../features/chat/cubits/group/group_info_cubit.dart';
 import '../../core/config/api_config.dart';
 import 'package:flutter_socket_io/features/chat/cubits/personal/personal_info_cubit.dart';
 import 'package:flutter_socket_io/features/chat/screens/shared/chat_info_screen.dart';
+import 'package:flutter_socket_io/features/chat/screens/shared/chat_media_screen.dart';
+import 'package:flutter_socket_io/features/chat/cubits/shared/chat_media_cubit.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -227,22 +229,71 @@ final router = GoRouter(
         final groupChatApiService = GroupChatApiService(token: token, currentUserId: currentUserId);
 
         try {
-          if (chatType == ChatType.group) {
-            final groupId = int.parse(chatIdString);
-            return BlocProvider(
-              create: (context) => GroupInfoCubit(groupChatApiService, groupId)..loadGroupDetails(),
-              child: ChatInfoScreen(chatIdString: groupId.toString(), chatType: chatType),
-            );
-          } else {
-             final personalUserId = chatIdString;
-             return BlocProvider(
-               create: (context) => PersonalInfoCubit(chatApiService, personalUserId),
-               child: ChatInfoScreen(chatIdString: personalUserId, chatType: chatType),
-             );
-          }
+          return BlocProvider<ChatMediaCubit>(
+            create: (context) => ChatMediaCubit(
+              chatIdString: chatIdString,
+              chatType: chatType,
+              chatApiService: chatApiService,
+              groupChatApiService: groupChatApiService,
+            ),
+            child: Builder(
+              builder: (mediaContext) {
+                if (chatType == ChatType.group) {
+                  final groupId = int.parse(chatIdString);
+                  return BlocProvider<GroupInfoCubit>(
+                    create: (context) => GroupInfoCubit(groupChatApiService, groupId)..loadGroupDetails(),
+                    child: ChatInfoScreen(chatIdString: groupId.toString(), chatType: chatType),
+                  );
+                } else {
+                  final personalUserId = chatIdString;
+                  return BlocProvider<PersonalInfoCubit>(
+                    create: (context) => PersonalInfoCubit(chatApiService, personalUserId),
+                    child: ChatInfoScreen(chatIdString: personalUserId, chatType: chatType),
+                  );
+                }
+              }
+            ),
+          );
         } catch (e) {
           return Scaffold(body: Center(child: Text('Invalid Chat ID format for type $chatTypeString: $chatIdString. Error: $e')));
         }
+      },
+    ),
+    // New route for displaying chat media
+    GoRoute(
+      path: '/chat-media/:chatId',
+      builder: (context, state) {
+        final chatIdString = state.pathParameters['chatId'];
+        final chatTypeString = state.uri.queryParameters['chatType'] ?? 'group'; // Default or error
+        final chatType = chatTypeString == 'personal' ? ChatType.personal : ChatType.group;
+
+        if (chatIdString == null) {
+          return const Scaffold(body: Center(child: Text('Missing Chat ID')));
+        }
+
+        // Need Auth state to get services
+        final authState = context.read<AuthCubit>().state;
+        final token = authState.accessToken;
+        final currentUserId = authState.userId;
+
+        if (token == null || currentUserId == null) {
+           return const Scaffold(body: Center(child: Text('User not authenticated')));
+        }
+
+        // Provide ChatMediaCubit here
+        return BlocProvider(
+          create: (_) => ChatMediaCubit(
+              chatIdString: chatIdString,
+              chatType: chatType,
+              // Provide the necessary API services based on auth state
+              chatApiService: ChatApiService(token: token, currentUserId: currentUserId),
+              groupChatApiService: GroupChatApiService(token: token, currentUserId: currentUserId),
+          ),
+          child: ChatMediaScreen(
+            chatIdString: chatIdString,
+            chatTypeString: chatTypeString,
+          ),
+        );
       },
     ),
   ],
