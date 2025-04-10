@@ -25,9 +25,10 @@ import '../../features/friendship/screens/user_search_screen.dart';
 import '../../features/friendship/screens/friend_requests_screen.dart';
 import '../../features/friendship/screens/friend_list_screen.dart';
 import '../../features/friendship/cubits/friend_list_cubit.dart';
-import '../../features/chat/screens/group/group_info_screen.dart';
 import '../../features/chat/cubits/group/group_info_cubit.dart';
 import '../../core/config/api_config.dart';
+import 'package:flutter_socket_io/features/chat/cubits/personal/personal_info_cubit.dart';
+import 'package:flutter_socket_io/features/chat/screens/shared/chat_info_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -204,34 +205,43 @@ final router = GoRouter(
         }
     ),
     GoRoute(
-      path: '/group-info/:groupId',
+      path: '/chat-info/:chatId',
       builder: (context, state) {
-        final groupIdString = state.pathParameters['groupId'];
-        if (groupIdString == null) {
-          return const Scaffold(body: Center(child: Text('Missing Group ID')));
+        final chatIdString = state.pathParameters['chatId'];
+        final chatTypeString = state.uri.queryParameters['chatType'] ?? 'group'; 
+        final chatType = chatTypeString == 'personal' ? ChatType.personal : ChatType.group;
+
+        if (chatIdString == null) {
+          return const Scaffold(body: Center(child: Text('Missing Chat ID')));
         }
+
+        final authState = context.read<AuthCubit>().state;
+        final token = authState.accessToken;
+        final currentUserId = authState.userId;
+
+        if (token == null || currentUserId == null) {
+            return const Scaffold(body: Center(child: Text('User not authenticated')));
+        }
+
+        final chatApiService = ChatApiService(token: token, currentUserId: currentUserId);
+        final groupChatApiService = GroupChatApiService(token: token, currentUserId: currentUserId);
+
         try {
-          final groupId = int.parse(groupIdString);
-
-          final authState = context.read<AuthCubit>().state;
-          final token = authState.accessToken;
-          final userId = authState.userId;
-
-          if (token == null || userId == null) {
-             return const Scaffold(body: Center(child: Text('User not authenticated')));
+          if (chatType == ChatType.group) {
+            final groupId = int.parse(chatIdString);
+            return BlocProvider(
+              create: (context) => GroupInfoCubit(groupChatApiService, groupId)..loadGroupDetails(),
+              child: ChatInfoScreen(chatIdString: groupId.toString(), chatType: chatType),
+            );
+          } else {
+             final personalUserId = chatIdString;
+             return BlocProvider(
+               create: (context) => PersonalInfoCubit(chatApiService, personalUserId),
+               child: ChatInfoScreen(chatIdString: personalUserId, chatType: chatType),
+             );
           }
-
-          final groupChatApiService = GroupChatApiService(
-            token: token,
-            currentUserId: userId,
-          );
-
-          return BlocProvider(
-            create: (context) => GroupInfoCubit(groupChatApiService, groupId),
-            child: GroupInfoScreen(groupId: groupId),
-          );
         } catch (e) {
-          return Scaffold(body: Center(child: Text('Invalid Group ID: $groupIdString. Error: $e')));
+          return Scaffold(body: Center(child: Text('Invalid Chat ID format for type $chatTypeString: $chatIdString. Error: $e')));
         }
       },
     ),

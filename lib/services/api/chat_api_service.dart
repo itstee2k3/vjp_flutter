@@ -326,6 +326,40 @@ class ChatApiService {
     }
   }
 
+  Future<User> getUserById(String userId) async {
+    try {
+      if (_token == null || _token!.isEmpty) {
+        throw Exception('No valid authentication token');
+      }
+      if (userId.isEmpty) {
+        throw Exception('User ID cannot be empty');
+      }
+
+      final response = await http.get(
+        Uri.parse("$baseUrl$userEndpoint/$userId"), // Use the specific user ID endpoint
+        headers: _headers,
+      );
+
+      print('GetUserById Response Status: ${response.statusCode}');
+      print('GetUserById Response Body: ${response.body}');
+
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> userData = jsonDecode(response.body);
+        // Assuming the API returns the user object directly
+        return User.fromJson(userData);
+      } else if (response.statusCode == 404) {
+          throw Exception('User not found: $userId');
+      }
+      else {
+        throw Exception('Failed to load user $userId: ${response.statusCode} ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('Error getting user by ID $userId: $e');
+      throw Exception('Error getting user details: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> getChatHistory(String userId, {int page = 1, int pageSize = 20}) async {
     try {
       final response = await http.get(

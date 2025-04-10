@@ -107,7 +107,7 @@ class _GroupMessageScreenState extends State<GroupMessageScreen> with ChatScreen
                   // Record that we're navigating away to info screen
                   _recordNavigationAway();
                   // Await the result of navigation to the info screen (result not used directly here)
-                  await context.push('/group-info/${widget.groupId}');
+                  await context.push('/chat-info/${widget.groupId}?chatType=group');
                 },
               );
             },

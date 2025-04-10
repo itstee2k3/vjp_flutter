@@ -8,6 +8,7 @@ class ChatHeader extends StatelessWidget {
   final VoidCallback? onInfoPressed;
   final VoidCallback onRefreshPressed;
   final bool isGroup;
+  final List<Widget>? actions;
 
   const ChatHeader({
     Key? key,
@@ -16,6 +17,7 @@ class ChatHeader extends StatelessWidget {
     this.onInfoPressed,
     required this.onRefreshPressed,
     this.isGroup = false,
+    this.actions,
   }) : super(key: key);
 
   @override
@@ -102,18 +104,15 @@ class ChatHeader extends StatelessWidget {
           ),
         ],
       ),
-      actions: [
-        // IconButton(
-        //   icon: const Icon(Icons.refresh),
-        //   onPressed: onRefreshPressed,
-        // ),
-        if (isGroup)
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Thông tin nhóm',
-            onPressed: onInfoPressed,
-          ),
-      ],
+      actions: actions ??
+        [
+          if (onInfoPressed != null)
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              tooltip: 'Info',
+              onPressed: onInfoPressed,
+            ),
+        ],
     );
   }
 }

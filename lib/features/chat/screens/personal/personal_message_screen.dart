@@ -6,6 +6,7 @@ import '../../widgets/chat_input_field.dart';
 import '../../widgets/message_list.dart';
 import '../../widgets/chat_header.dart';
 import '../../mixins/chat_screen_mixin.dart';
+import 'package:go_router/go_router.dart';
 
 class PersonalMessageScreen extends StatefulWidget {
   final String username;
@@ -42,6 +43,15 @@ class _PersonalMessageScreenState extends State<PersonalMessageScreen> with Chat
               onRefreshPressed: () {
                 context.read<PersonalChatCubit>().resetAndReloadMessages();
               },
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.info_outline),
+                  tooltip: 'View Info',
+                  onPressed: () {
+                    context.push('/chat-info/${widget.userId}?chatType=personal');
+                  },
+                ),
+              ],
             );
           },
         ),
